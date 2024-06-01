@@ -37,7 +37,7 @@ exports.getCustomerById = async (req, res) => {
 // Controller function to update a customer by ID
 exports.updateCustomer = async (req, res) => {
   const updates = Object.keys(req.body);
-  const allowedUpdates = ['username', 'passwordHash', 'email', 'personalInfo', 'shippingAddresses'];
+  const allowedUpdates = ['name', 'passwordHash', 'email', 'personalInfo', 'shippingAddresses'];
   const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
 
   if (!isValidOperation) {
