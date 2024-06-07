@@ -17,7 +17,6 @@ exports.createVendor = async (req, res) => {
       password: hashedPassword,
       email: req.body.email,
       vendorInfo: req.body.vendorInfo,
-      availableLocalities: req.body.availableLocalities,
       role: "vendor"
     });
 

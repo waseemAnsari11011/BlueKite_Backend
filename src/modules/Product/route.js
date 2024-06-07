@@ -32,4 +32,10 @@ router.delete('/products/:id', productController.deleteProduct);
 router.get('/products', productController.getAllProducts);
 router.get('/products/:id', productController.getProductById);
 
+router.get('/categories/:id/products', productController.getProductsByCategoryId);
+router.get('/products/:id/similar', productController.getSimilarProducts);
+router.get('/recentlyAddedProducts', productController.getRecentlyAddedProducts);
+router.get('/onDiscountProducts', productController.getDiscountedProducts);
+router.get('/searchProducts', productController.fuzzySearchProducts);
+
 module.exports = router;

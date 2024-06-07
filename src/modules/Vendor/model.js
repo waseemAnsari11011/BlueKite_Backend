@@ -43,10 +43,6 @@ const vendorSchema = new Schema({
       }
     }
   },
-  availableLocalities: [{
-    type: String,
-    required: true
-  }],
   role: {
     type: String,
     default: 'vendor'

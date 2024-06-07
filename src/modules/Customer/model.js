@@ -3,54 +3,41 @@ const Schema = mongoose.Schema;
 
 // Define the schema
 const customerSchema = new Schema({
-  passwordHash: {
+  password: {
     type: String,
-    required: true
   },
   email: {
     type: String,
-    required: true,
     unique: true
   },
-  personalInfo: {
-    firstName: {
-      type: String,
-    },
-    lastName: {
-      type: String,
-    },
-    contactNumber: {
-      type: String,
-      required: true
-    }
-  },
-  shippingAddresses: [
-    {
-      addressLine1: {
-        type: String,
-      },
-      addressLine2: String,
-      city: {
-        type: String,
-      },
-      state: {
-        type: String,
-      },
-      country: {
-        type: String,
-      },
-      postalCode: {
-        type: String,
-      }
-    }
-  ],
-  availableLocalities: [{
+  contactNumber: {
     type: String,
     required: true
-  }],
+  },
+  shippingAddresses: {
+    address: {
+      type: String,
+    },
+    city: {
+      type: String,
+    },
+    state: {
+      type: String,
+    },
+    country: {
+      type: String,
+    },
+    postalCode: {
+      type: String,
+    }
+  }
+  ,
+  availableLocalities: {
+    type: String,
+  },
   role: {
     type: String,
-    default: 'vendor'
+    default: 'customer'
   },
   isRestricted: {
     type: Boolean,
@@ -65,6 +52,12 @@ const customerSchema = new Schema({
     default: Date.now
   }
 });
+
+
+// Method to compare passwords
+customerSchema.methods.comparePassword = async function (candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password);
+};
 
 // Create the model
 const Customer = mongoose.model('Customer', customerSchema);

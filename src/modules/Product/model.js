@@ -1,4 +1,4 @@
-// Import mongoose
+// model.js
 const mongoose = require('mongoose');
 
 // Define the Product Schema
@@ -36,7 +36,11 @@ const productSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Vendor',
         required: true
-    }
+    },
+    availableLocalities: [{
+        type: String,
+        required: true
+    }],
 }, {
     timestamps: true // Automatically add createdAt and updatedAt timestamps
 });
