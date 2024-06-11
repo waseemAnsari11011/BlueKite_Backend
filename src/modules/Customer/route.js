@@ -3,6 +3,7 @@ const router = express.Router();
 const customerController = require('./controller');
 const authenticateToken = require('../Middleware/authMiddleware');
 const authorizeAdmin = require('../Middleware/authorizeMiddleware');
+const upload = require('../Middleware/uploadMiddleware'); // Adjust the path as necessary
 
 // Route to create a new customer
 router.post('/customers/signup', customerController.createCustomer);
@@ -19,8 +20,6 @@ router.post('/send-otp', customerController.sendOtp);
 // Route to get a customer by ID
 router.get('/customers/:id', customerController.getCustomerById);
 
-// Route to update a customer by ID
-router.put('/customers/:id', customerController.updateCustomer);
 
 // Route to delete a customer by ID
 router.delete('/customers/:id', customerController.deleteCustomer);
@@ -38,5 +37,8 @@ router.put('/customers/restrict/:id', authenticateToken, authorizeAdmin, custome
 router.put('/customers/unrestrict/:id', authenticateToken, authorizeAdmin, customerController.unRestrictCustomer);
 
 router.post('/check-restricted', customerController.checkIfUserIsRestricted);
+
+// Route to update a customer by ID
+router.put('/single-customer/:id',upload, customerController.updateCustomer);
 
 module.exports = router;

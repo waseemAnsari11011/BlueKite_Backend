@@ -46,8 +46,10 @@ exports.addProduct = async (req, res) => {
 // Controller function to get all products
 exports.getAllProducts = async (req, res) => {
     try {
+        const vendorId = req.params.vendorId;
+
         // Find all products and populate the category field
-        const products = await Product.find().populate('category');
+        const products = await Product.find({ vendor: vendorId}).populate('category');
 
         // Send response with the products
         res.status(200).json({
@@ -81,8 +83,11 @@ exports.getProductsLowQuantity = async (req, res) => {
 
 // Controller function to get a product by ID
 exports.getProductById = async (req, res) => {
+    console.log("getProductById->>", req.params.id)
+
     try {
         const { id } = req.params;
+
 
         // Find the product by ID and populate the category field
         const product = await Product.findById(id)
