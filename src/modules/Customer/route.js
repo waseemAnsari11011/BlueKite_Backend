@@ -3,7 +3,10 @@ const router = express.Router();
 const customerController = require('./controller');
 const authenticateToken = require('../Middleware/authMiddleware');
 const authorizeAdmin = require('../Middleware/authorizeMiddleware');
-const upload = require('../Middleware/uploadMiddleware'); // Adjust the path as necessary
+const handleUpload = require('../Middleware/uploadHandler');
+
+// Define the upload directory
+const uploadDir = 'uploads/customer';
 
 // Route to create a new customer
 router.post('/customers/signup', customerController.createCustomer);
@@ -39,6 +42,6 @@ router.put('/customers/unrestrict/:id', authenticateToken, authorizeAdmin, custo
 router.post('/check-restricted', customerController.checkIfUserIsRestricted);
 
 // Route to update a customer by ID
-router.put('/single-customer/:id',upload, customerController.updateCustomer);
+router.put('/single-customer/:id',handleUpload(uploadDir), customerController.updateCustomer);
 
 module.exports = router;

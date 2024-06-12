@@ -118,6 +118,8 @@ exports.updateProduct = async (req, res) => {
         const { id } = req.params;
         const { name, price, discount, description, category, existingImages, vendor, availableLocalities, quantity } = req.body;
 
+        console.log("existingImages-->>", existingImages)
+
         // Find the product by ID
         const product = await Product.findById(id);
 
@@ -126,6 +128,19 @@ exports.updateProduct = async (req, res) => {
                 message: 'Product not found'
             });
         }
+
+        // Delete product images from the file system that are not in existingImages
+        product.images.forEach(imagePath => {
+            if (!existingImages.includes(imagePath)) {
+                console.log("Deleting imagePath-->>", imagePath);
+                const fullPath = path.join(imagePath); // Adjust the path accordingly
+                fs.unlink(fullPath, err => {
+                    if (err) {
+                        console.error(`Failed to delete image file: ${fullPath}`, err);
+                    }
+                });
+            }
+        });
 
         // Update the product details
         product.name = name || product.name;

@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../Middleware/uploadMiddleware'); // Adjust the path as necessary
+const upload = require('../Middleware/uploadHandler'); // Adjust the path as necessary
 const productController = require('./controller'); // Adjust the path as necessary
 
 // Route to add a new product with file upload middleware
-router.post('/products', upload, productController.addProduct);
-router.put('/products/:id', upload, productController.updateProduct);
+router.post('/products', upload('uploads/products'), productController.addProduct);
+router.put('/products/:id', upload('uploads/products'), productController.updateProduct);
 router.delete('/products/:id', productController.deleteProduct);
 router.get('/products/:vendorId', productController.getAllProducts);
 router.get('/products-low-quantity/:vendorId', productController.getProductsLowQuantity);
