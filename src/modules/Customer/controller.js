@@ -68,7 +68,7 @@ exports.customerLogin = async (req, res) => {
     }
 
     // Generate a token
-    const token = jwt.sign({ id: customer._id, role: customer.role }, secret, { expiresIn: '1h' });
+    const token = jwt.sign({ id: customer._id, role: customer.role }, secret);
 
     // Customer authenticated successfully
     res.status(200).json({ message: 'Login successful', customer, token });
@@ -103,7 +103,7 @@ exports.customerLoginPhone = async (req, res) => {
     }
 
     // Generate a token
-    const token = jwt.sign({ id: customer._id, role: customer.role }, secret, { expiresIn: '1h' });
+    const token = jwt.sign({ id: customer._id, role: customer.role }, secret);
 
     res.status(200).json({ message: 'Login successful', customer, token });
 
@@ -328,15 +328,17 @@ exports.checkIfUserIsRestricted = async (req, res) => {
   try {
     const { email, contactNumber } = req.body;
 
+    console.log("contactNumber-->>", contactNumber, email)
+
     // Validate if at least one identifier is provided
     if (!email && !contactNumber) {
       return res.status(400).json({ error: 'Email or contact number is required' });
     }
 
     // Find the customer by email or contact number
-    const customer = await Customer.findOne({ 
-      $or: [{ email }, { contactNumber }]
-    });
+    const customer = await Customer.findOne({contactNumber});
+
+    console.log("customer--->>", customer)
 
     // If customer is not found, return an error
     if (!customer) {

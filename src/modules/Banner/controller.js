@@ -38,7 +38,7 @@ exports.updateBanner = async (req, res) => {
         const { id } = req.params;
         const { name, existingImages } = req.body;
 
-        console.log("existingImages-->>", existingImages);
+        // console.log("existingImages-->>", existingImages);
 
         // Find the banner by ID
         const banner = await Banner.findById(id);
@@ -91,6 +91,14 @@ exports.makeBannerActive = async (req, res) => {
         const { id } = req.params;
         const { isActive } = req.body;
 
+        if (typeof isActive !== 'boolean') {
+            return res.status(400).json({
+                message: 'Invalid isActive value. It should be a boolean.'
+            });
+        }
+
+        console.log("isActive--->>", isActive);
+
         // Find the banner by ID
         const banner = await Banner.findById(id);
 
@@ -101,24 +109,27 @@ exports.makeBannerActive = async (req, res) => {
         }
 
         // Update the banner details
-        banner.isActive = isActive || banner.isActive;
+        banner.isActive = isActive;
+
+        console.log("banner-->>", banner);
 
         // Save the updated banner to the database
         const updatedBanner = await banner.save();
 
         // Send response
         res.status(200).json({
-            message: 'Banner activated successfully',
+            message: 'Banner status updated successfully',
             banner: updatedBanner
         });
     } catch (error) {
         console.error(error);
         res.status(500).json({
-            message: 'Failed to active banner',
+            message: 'Failed to update banner status',
             error: error.message
         });
     }
 };
+
 
 
 // Controller function to get all banners
@@ -140,6 +151,27 @@ exports.getAllBanner = async (req, res) => {
         });
     }
 };
+
+// Controller function to get all active banners
+exports.getAllActiveBanner = async (req, res) => {
+    try {
+        // Fetch all active banners from the database
+        const banners = await Banner.find({ isActive: true });
+
+        // Send the banners in the response
+        res.status(200).json({
+            message: 'Active banners retrieved successfully',
+            banners
+        });
+    } catch (error) {
+        console.error('Error fetching active banners:', error);
+        res.status(500).json({
+            message: 'Failed to retrieve active banners',
+            error: error.message
+        });
+    }
+};
+
 
 // Controller function to get a banner by ID
 exports.getBannerById = async (req, res) => {
@@ -186,7 +218,7 @@ exports.deleteBanner = async (req, res) => {
 
         // Delete banner images from the file system
         deletedBanner.images.forEach(imagePath => {
-            const fullPath = path.join( imagePath); // Adjust the path accordingly
+            const fullPath = path.join(imagePath); // Adjust the path accordingly
             fs.unlink(fullPath, err => {
                 if (err) {
                     console.error(`Failed to delete image file: ${fullPath}`, err);

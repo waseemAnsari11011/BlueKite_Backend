@@ -13,6 +13,7 @@ router.put('/banner/:id', handleUpload(uploadDir), bannerController.updateBanner
 router.put('/banner-active/:id', bannerController.makeBannerActive);
 router.delete('/banner/:id', bannerController.deleteBanner);
 router.get('/banner', bannerController.getAllBanner);
+router.get('/all-active-banner', bannerController.getAllActiveBanner);
 router.get('/banner/:id', bannerController.getBannerById);
 
 module.exports = router;

@@ -50,7 +50,7 @@ exports.updateCategory = async (req, res) => {
         // Delete category images from the file system that are not in existingImages
         category.images.forEach(imagePath => {
             if (!existingImages.includes(imagePath)) {
-                console.log("Deleting imagePath-->>", imagePath);
+                // console.log("Deleting imagePath-->>", imagePath);
                 const fullPath = path.join(imagePath); // Adjust the path accordingly
                 fs.unlink(fullPath, err => {
                     if (err) {
