@@ -26,6 +26,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // MongoDB connection
 const mongoUri = `mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@${process.env.DB_NAME}/${process.env.MONGO_HOST}?retryWrites=true&w=majority`;
+
+
 mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -46,5 +48,7 @@ app.use(ContactRoutes)
 app.use(BannerRoutes)
 
 app.listen(port, () => {
+  console.log("creds=>",process.env.MONGO_USERNAME, process.env.MONGO_PASSWORD, process.env.DB_NAME, process.env.MONGO_HOST)
+
   console.log(`Server is running at http://localhost:${port}`);
 });
