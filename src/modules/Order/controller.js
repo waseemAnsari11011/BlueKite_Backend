@@ -3,7 +3,10 @@ const Product = require('../Product/model');
 const mongoose = require('mongoose');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-
+const Customer = require('../Customer/model');
+const { sendPushNotification } = require('../utils/pushNotificationUtil');
+const emailService = require('../utils/emailService');
+const Vendor = require('../Vendor/model');
 //razorpay
 const razorpay = new Razorpay({
     key_id: process.env.KEY_ID,
@@ -202,6 +205,9 @@ exports.createOrder = async (req, res) => {
             return res.status(400).json({ error: 'All required fields must be provided' });
         }
 
+        const customerDetails = await Customer.findById(customer);
+        console.log("customerDetails--->", customerDetails)
+
         // Validate each vendor and their products
         for (const vendor of vendors) {
             if (!vendor.vendor || !vendor.products) {
@@ -240,6 +246,19 @@ exports.createOrder = async (req, res) => {
 
         // Save the order to the database
         const savedOrder = await newOrder.save();
+
+        // Send new order notification email to each vendor
+        for (const vendor of vendors) {
+
+            const vendorId = new mongoose.Types.ObjectId(vendor.vendor);
+
+            // Fetch the vendor's role using the vendorId
+            const vendorDetails = await Vendor.findById(vendorId)
+
+            // console.log("vendor.vendor.email-->>", vendorDetails)
+
+            await emailService.sendNewOrderNotificationEmail(vendorDetails.email, savedOrder, customerDetails.contactNumber);
+        }
 
         await session.commitTransaction();
         session.endSession();
@@ -470,6 +489,27 @@ exports.updateOrderStatus = async (req, res) => {
 
         if (!order) {
             return res.status(404).json({ error: 'Order or vendor not found' });
+        }
+
+        // Extract customer ID from the order
+        const customerId = order.customer._id;
+
+        // Retrieve the customer from database to get FCM token
+        const customer = await Customer.findById(customerId);
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        const fcmtoken = customer.fcmDeviceToken; // Get FCM token from customer
+
+        const title = 'Order Status Updated';
+        const body = `The status of your order ${orderId} has been updated to ${newStatus}.`;
+        try {
+            // Assuming you have a function or service to send push notifications
+            let pushNotificationRes = await sendPushNotification(fcmtoken, title, body);
+            console.log("Push notification response:", pushNotificationRes);
+        } catch (error) {
+            console.error('Error sending push notification:', error);
         }
 
         res.json(order);
