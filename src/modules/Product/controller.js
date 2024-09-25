@@ -232,7 +232,6 @@ exports.getProductsByCategoryId = async (req, res) => {
         const products = await Product.find({
             category: categoryId,
             availableLocalities: { $in: [userLocation, 'all'] },
-            quantity: { $gt: 0 } // Add this filter to ensure quantity is greater than 0
         })
             .skip((page - 1) * limit)
             .limit(limit);
@@ -242,7 +241,6 @@ exports.getProductsByCategoryId = async (req, res) => {
         const totalProducts = await Product.countDocuments({
             category: categoryId,
             availableLocalities: { $in: [userLocation, 'all'] },
-            quantity: { $gt: 0 }
         });
 
         // Send the products in the response with pagination metadata
@@ -280,7 +278,6 @@ exports.getSimilarProducts = async (req, res) => {
         const similarProducts = await Product.find({
             category: product.category,
             availableLocalities: { $in: [userLocation, 'all'] },
-            quantity: { $gt: 0 },
             _id: { $ne: productId }
         })
             .skip((page - 1) * limit)
@@ -289,7 +286,6 @@ exports.getSimilarProducts = async (req, res) => {
         const totalSimilarProducts = await Product.countDocuments({
             category: product.category,
             availableLocalities: { $in: [userLocation, 'all'] },
-            quantity: { $gt: 0 },
             _id: { $ne: productId }
         });
 
@@ -313,7 +309,7 @@ exports.getRecentlyAddedProducts = async (req, res) => {
         const userLocation = req.query.userLocation;
 
         // Construct the filter for availableLocalities
-        const locationFilter = userLocation ? { availableLocalities: { $in: [userLocation, 'all'] }, quantity: { $gt: 0 } } : { quantity: { $gt: 0 } };
+        const locationFilter = userLocation ? { availableLocalities: { $in: [userLocation, 'all'] }} : {  };
 
         // Find the most recently added products with the location filter
         const recentlyAddedProducts = await Product.find(locationFilter)
@@ -343,7 +339,7 @@ exports.getDiscountedProducts = async (req, res) => {
         const userLocation = req.query.userLocation;
 
         // Construct the filter for availableLocalities
-        const locationFilter = userLocation ? { availableLocalities: { $in: [userLocation, 'all'] }, quantity: { $gt: 0 } } : { quantity: { $gt: 0 } };
+        const locationFilter = userLocation ? { availableLocalities: { $in: [userLocation, 'all'] } } : {  };
 
         // Combine the discount filter with the location filter
         const query = {
@@ -382,7 +378,7 @@ exports.fuzzySearchProducts = async (req, res) => {
         const regexQuery = new RegExp(searchQuery, 'i'); // 'i' for case-insensitive
 
         // Construct the filter for availableLocalities
-        const locationFilter = userLocation ? { availableLocalities: { $in: [userLocation, 'all'] }, quantity: { $gt: 0 } } : { quantity: { $gt: 0 } };
+        const locationFilter = userLocation ? { availableLocalities: { $in: [userLocation, 'all'] }} : {  };
 
         // Combine the search query with the location filter
         const query = {
