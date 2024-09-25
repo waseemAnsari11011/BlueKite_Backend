@@ -46,6 +46,9 @@ const customerSchema = new Schema({
     type: String,
     default: 'customer'
   },
+  fcmDeviceToken: {
+    type: String,
+  },
   isRestricted: {
     type: Boolean,
     default: false
