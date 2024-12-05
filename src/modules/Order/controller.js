@@ -218,7 +218,7 @@ exports.createOrder = async (req, res) => {
     console.log("deliveryCharge--->>", deliveryCharge);
 
     // Validate required fields
-    if (!customer || !vendors || !shippingAddress || !deliveryCharge) {
+    if (!customer || !vendors || !shippingAddress) {
       return res
         .status(400)
         .json({ error: "All required fields must be provided" });
