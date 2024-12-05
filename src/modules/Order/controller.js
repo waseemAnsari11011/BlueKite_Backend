@@ -213,19 +213,19 @@ exports.createOrder = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
-  console.log("createOrder--->>");
   try {
-    const { customer, vendors, shippingAddress } = req.body;
+    const { customer, vendors, shippingAddress, deliveryCharge } = req.body;
+    console.log("deliveryCharge--->>", deliveryCharge);
 
     // Validate required fields
-    if (!customer || !vendors || !shippingAddress) {
+    if (!customer || !vendors || !shippingAddress || !deliveryCharge) {
       return res
         .status(400)
         .json({ error: "All required fields must be provided" });
     }
 
     const customerDetails = await Customer.findById(customer);
-    console.log("customerDetails--->", customerDetails);
+    // console.log("customerDetails--->", customerDetails);
 
     // Validate each vendor and their products
     for (const vendor of vendors) {
@@ -248,6 +248,7 @@ exports.createOrder = async (req, res) => {
       customer,
       vendors,
       shippingAddress,
+      deliveryCharge,
     });
 
     // Update product quantities and save the order to the database
@@ -372,6 +373,7 @@ exports.getOrdersByVendor = async (req, res) => {
             isPaymentVerified: "$isPaymentVerified",
             paymentStatus: "$paymentStatus",
             razorpay_payment_id: "$razorpay_payment_id",
+            deliveryCharge: "$deliveryCharge", // Include delivery charge in grouping
           },
           products: {
             $push: {
@@ -395,6 +397,7 @@ exports.getOrdersByVendor = async (req, res) => {
           isPaymentVerified: "$_id.isPaymentVerified",
           paymentStatus: "$_id.paymentStatus",
           razorpay_payment_id: "$_id.razorpay_payment_id",
+          deliveryCharge: "$_id.deliveryCharge", // Add delivery charge to the projection
           vendors: {
             vendor: "$_id.vendor",
             orderStatus: "$_id.orderStatus",

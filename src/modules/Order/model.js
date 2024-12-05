@@ -87,6 +87,11 @@ const orderSchema = new Schema({
     enum: ["Paid", "Unpaid"],
     default: "Unpaid",
   },
+  deliveryCharge: {
+    type: Number,
+    required: true,
+    min: 0, // Ensures that the price cannot be negative
+  },
   razorpay_payment_id: {
     type: String,
   },
