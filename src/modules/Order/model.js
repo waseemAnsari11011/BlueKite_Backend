@@ -89,7 +89,6 @@ const orderSchema = new Schema({
   },
   deliveryCharge: {
     type: Number,
-    required: true,
     min: 0, // Ensures that the price cannot be negative
   },
   razorpay_payment_id: {
