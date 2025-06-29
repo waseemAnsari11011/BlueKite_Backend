@@ -35,17 +35,17 @@ mongoose
   .catch((err) => console.error("Could not connect to MongoDB", err));
 
 // Routes
-app.use(customerRoutes);
-app.use(vendorRoutes);
-app.use(ProductRoutes);
-app.use(CategoryRoutes);
-app.use(OrderRoutes);
-app.use(ReportRoutes);
-app.use(InquiryRoutes);
-app.use(FaqsRoutes);
-app.use(ContactRoutes);
-app.use(BannerRoutes);
-app.use(DeliveryRoutes);
+app.use("/api/", customerRoutes);
+app.use("/api/", vendorRoutes);
+app.use("/api/", ProductRoutes);
+app.use("/api/", CategoryRoutes);
+app.use("/api/", OrderRoutes);
+app.use("/api/", ReportRoutes);
+app.use("/api/", InquiryRoutes);
+app.use("/api/", FaqsRoutes);
+app.use("/api/", ContactRoutes);
+app.use("/api/", BannerRoutes);
+app.use("/api/", DeliveryRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
