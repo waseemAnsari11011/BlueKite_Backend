@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
 // Define the schema
@@ -15,11 +15,10 @@ const customerSchema = new Schema({
   email: {
     type: String,
     unique: true,
-    default: null
   },
   contactNumber: {
     type: String,
-    required: true
+    required: true,
   },
   shippingAddresses: {
     address: {
@@ -36,33 +35,31 @@ const customerSchema = new Schema({
     },
     postalCode: {
       type: String,
-    }
-  }
-  ,
+    },
+  },
   availableLocalities: {
     type: String,
   },
   role: {
     type: String,
-    default: 'customer'
+    default: "customer",
   },
   fcmDeviceToken: {
     type: String,
   },
   isRestricted: {
     type: Boolean,
-    default: false
+    default: false,
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
-
 
 // Method to compare passwords
 customerSchema.methods.comparePassword = async function (candidatePassword) {
@@ -70,6 +67,6 @@ customerSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 // Create the model
-const Customer = mongoose.model('Customer', customerSchema);
+const Customer = mongoose.model("Customer", customerSchema);
 
 module.exports = Customer;
