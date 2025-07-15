@@ -326,7 +326,8 @@ exports.getOrdersByVendor = async (req, res) => {
       { $unwind: "$vendors" },
       // Match only those documents where the vendor ID matches
       { $match: { "vendors.vendor": vendorId } },
-      { $sort: { createdAt: -1 } },
+      // Sort by createdAt in descending order for consistent chronological order
+      { $sort: { createdAt: -1 } }, // Changed from _id to createdAt
       // Lookup to join customer details
       {
         $lookup: {
@@ -375,6 +376,7 @@ exports.getOrdersByVendor = async (req, res) => {
             paymentStatus: "$paymentStatus",
             razorpay_payment_id: "$razorpay_payment_id",
             deliveryCharge: "$deliveryCharge", // Include delivery charge in grouping
+            createdAt: "$createdAt", // Include createdAt in grouping for consistent sorting after group
           },
           products: {
             $push: {
@@ -388,6 +390,8 @@ exports.getOrdersByVendor = async (req, res) => {
           },
         },
       },
+      // Re-sort after grouping to maintain the order based on createdAt
+      { $sort: { "_id.createdAt": -1 } },
       // Project to reshape the output document
       {
         $project: {
@@ -399,6 +403,7 @@ exports.getOrdersByVendor = async (req, res) => {
           paymentStatus: "$_id.paymentStatus",
           razorpay_payment_id: "$_id.razorpay_payment_id",
           deliveryCharge: "$_id.deliveryCharge", // Add delivery charge to the projection
+          createdAt: "$_id.createdAt", // Add createdAt to the projection
           vendors: {
             vendor: "$_id.vendor",
             orderStatus: "$_id.orderStatus",
