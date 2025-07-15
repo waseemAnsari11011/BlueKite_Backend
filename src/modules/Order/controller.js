@@ -525,7 +525,7 @@ exports.updateOrderStatus = async (req, res) => {
     // Find the order by ID and update the status for the specific vendor
     const order = await Order.findOneAndUpdate(
       {
-        _id: new mongoose.Types.ObjectId(orderId),
+        orderId: orderId,
         "vendors.vendor": new mongoose.Types.ObjectId(vendorId),
       },
       { $set: { "vendors.$.orderStatus": newStatus } },
