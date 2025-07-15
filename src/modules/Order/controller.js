@@ -326,7 +326,7 @@ exports.getOrdersByVendor = async (req, res) => {
       { $unwind: "$vendors" },
       // Match only those documents where the vendor ID matches
       { $match: { "vendors.vendor": vendorId } },
-      { $sort: { _id: -1 } },
+      { $sort: { createdAt: -1 } },
       // Lookup to join customer details
       {
         $lookup: {
