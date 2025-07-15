@@ -176,15 +176,16 @@ exports.updatePaymentStatusManually = async (req, res) => {
   try {
     console.log("updatePaymentStatus");
     // Extract required fields from the request body
-    const { orderId, newStatus } = req.body;
+    const { orderId, newStatus } = req.body; // orderId here refers to your custom string ID
 
     // Ensure all required fields are present
     if (!newStatus || !orderId) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Find the order in the database using the orderId
-    let order = await Order.findById(orderId);
+    // Find the order in the database using the custom orderId field
+    // Changed from findById(orderId) to findOne({ orderId: orderId })
+    let order = await Order.findOne({ orderId: orderId });
 
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
@@ -203,6 +204,8 @@ exports.updatePaymentStatusManually = async (req, res) => {
 
     res.status(200).json(updatedOrder);
   } catch (error) {
+    // It's good practice to log the actual error on the server
+    console.error("Error updating payment status manually:", error);
     res.status(400).json({ error: error.message });
   }
 };
