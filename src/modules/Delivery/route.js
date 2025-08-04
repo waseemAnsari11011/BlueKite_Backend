@@ -2,13 +2,13 @@ const express = require("express");
 const router = express.Router();
 const deliveryChargeController = require("./controller"); // Make sure to create appropriate controller methods
 const authenticateToken = require("../Middleware/authMiddleware");
-const authorizeAdmin = require("../Middleware/authorizeMiddleware");
+const { authorizeVendor } = require("../Middleware/authorizeMiddleware");
 
 // Route to create a new delivery charge
 router.post(
   "/delivery-charges",
   authenticateToken,
-  authorizeAdmin,
+  authorizeVendor,
   deliveryChargeController.createDeliveryCharge
 );
 
@@ -19,7 +19,7 @@ router.get("/delivery-charges", deliveryChargeController.getDeliveryCharges);
 router.get(
   "/delivery-charges/:id",
   authenticateToken,
-  authorizeAdmin,
+  authorizeVendor,
   deliveryChargeController.getDeliveryChargeById
 );
 
@@ -27,7 +27,7 @@ router.get(
 router.put(
   "/delivery-charges/:id",
   authenticateToken,
-  authorizeAdmin,
+  authorizeVendor,
   deliveryChargeController.updateDeliveryCharge
 );
 
@@ -35,7 +35,7 @@ router.put(
 router.delete(
   "/delivery-charges/:id",
   authenticateToken,
-  authorizeAdmin,
+  authorizeVendor,
   deliveryChargeController.deleteDeliveryCharge
 );
 
