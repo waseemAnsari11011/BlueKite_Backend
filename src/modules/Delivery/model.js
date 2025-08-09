@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 // Define the DeliveryCharge schema
 const deliveryChargeSchema = new mongoose.Schema({
+  vendor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Vendor", // Reference to Vendor model
+    required: true,
+  },
   price: {
     type: Number,
     required: true,

@@ -5,19 +5,31 @@ exports.createDeliveryCharge = async (req, res) => {
   try {
     const { price, currency } = req.body;
 
+    // Ensure the logged-in user is a vendor
+    if (
+      !req.user ||
+      (req.user.role !== "vendor" && req.user.role !== "admin")
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Only vendors can create delivery charges." });
+    }
+
     // Validate input
-    if (price <= 0) {
+    if (!price || price <= 0) {
       return res
         .status(400)
         .json({ message: "Price must be a positive number" });
     }
 
     const newDeliveryCharge = new DeliveryCharge({
+      vendor: req.user.id, // vendor ID from JWT payload
       price,
       currency,
     });
 
     await newDeliveryCharge.save();
+
     res.status(201).json({
       message: "Delivery charge created successfully",
       data: newDeliveryCharge,

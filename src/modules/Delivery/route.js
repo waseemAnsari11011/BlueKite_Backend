@@ -2,12 +2,11 @@ const express = require("express");
 const router = express.Router();
 const deliveryChargeController = require("./controller"); // Make sure to create appropriate controller methods
 const authenticateToken = require("../Middleware/authMiddleware");
-const { authorizeVendor } = require("../Middleware/authorizeMiddleware");
 
 // Route to create a new delivery charge
 router.post(
   "/delivery-charges",
-
+  authenticateToken,
   deliveryChargeController.createDeliveryCharge
 );
 
