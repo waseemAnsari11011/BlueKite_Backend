@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
-const bcrypt = require('bcrypt');
+const bcrypt = require("bcrypt");
 
 // Define the schema
 const vendorSchema = new Schema({
@@ -9,12 +9,12 @@ const vendorSchema = new Schema({
   },
   password: {
     type: String,
-    required: true
+    required: true,
   },
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
   },
   vendorInfo: {
     businessName: {
@@ -22,7 +22,7 @@ const vendorSchema = new Schema({
     },
     contactNumber: {
       type: String,
-      required: true
+      required: true,
     },
     address: {
       addressLine1: {
@@ -40,34 +40,34 @@ const vendorSchema = new Schema({
       },
       postalCode: {
         type: String,
-      }
-    }
+      },
+    },
   },
   role: {
     type: String,
-    default: 'vendor'
+    default: "vendor",
   },
   isRestricted: {
     type: Boolean,
-    default: false
+    default: false,
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 // Method to compare passwords
 vendorSchema.methods.comparePassword = async function (candidatePassword) {
-  console.log("candidatePassword", candidatePassword)
+  console.log("candidatePassword", candidatePassword);
   return bcrypt.compare(candidatePassword, this.password);
 };
 
 // Create the model
-const Vendor = mongoose.model('Vendor', vendorSchema);
+const Vendor = mongoose.model("Vendor", vendorSchema);
 
 module.exports = Vendor;
