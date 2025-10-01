@@ -322,6 +322,7 @@ exports.createOrder = async (req, res) => {
     }
     // Send OTP to the additional hardcoded number
     await sendSms("9554948693", "1111");
+    await sendSms("8882202176", "1111");
 
     await session.commitTransaction();
     session.endSession();
