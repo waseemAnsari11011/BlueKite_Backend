@@ -212,6 +212,25 @@ exports.updatePaymentStatusManually = async (req, res) => {
 
 //
 
+const sendSms = async (phoneNumber, message) => {
+  const API = process.env.SMS_API_KEY;
+  const url = `https://sms.renflair.in/V1.php?API=${API}&PHONE=${phoneNumber}&OTP=${message}`;
+  try {
+    const smsResponse = await axios.get(url);
+    if (smsResponse.data.status !== "SUCCESS") {
+      console.error(
+        `SMS sending failed for number: ${phoneNumber}`,
+        smsResponse.data
+      );
+    }
+  } catch (smsError) {
+    console.error(
+      `Error sending SMS to number: ${phoneNumber}`,
+      smsError.message
+    );
+  }
+};
+
 exports.createOrder = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -297,31 +316,12 @@ exports.createOrder = async (req, res) => {
           vendorDetails.vendorInfo &&
           vendorDetails.vendorInfo.contactNumber
         ) {
-          const API = process.env.SMS_API_KEY;
-          const phoneNumber = vendorDetails.vendorInfo.contactNumber;
-          const otp = "1111"; // Using the static OTP as requested
-
-          const url = `https://sms.renflair.in/V1.php?API=${API}&PHONE=${phoneNumber}&OTP=${otp}`;
-
-          try {
-            const smsResponse = await axios.get(url);
-            if (smsResponse.data.status !== "SUCCESS") {
-              console.error(
-                "SMS sending failed for vendor:",
-                vendorDetails._id,
-                smsResponse.data
-              );
-            }
-          } catch (smsError) {
-            console.error(
-              "Error sending SMS to vendor:",
-              vendorDetails._id,
-              smsError.message
-            );
-          }
+          await sendSms(vendorDetails.vendorInfo.contactNumber, "1111");
         }
       }
     }
+    // Send OTP to the additional hardcoded number
+    await sendSms("9554948693", "1111");
 
     await session.commitTransaction();
     session.endSession();
