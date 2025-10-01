@@ -95,17 +95,20 @@ exports.getAllCategory = async (req, res) => {
     let categories = await Category.find();
 
     if (userAddress) {
-      const userAddressWords = userAddress.toLowerCase().split(/\s+/);
+      const userAddressWords = userAddress.toLowerCase().split(/[\s,]+/);
+
       categories = categories.filter((category) => {
         if (!category.addresses || category.addresses.length === 0) {
-          return true; // Always show categories with no specified address
+          // If a user address is provided, categories without a specific address should not be shown.
+          return false;
         }
+        // Check if any of the category's address keywords are in the user's address
         return category.addresses.some((categoryAddress) => {
           const categoryAddressWords = categoryAddress
             .toLowerCase()
-            .split(/\s+/);
-          return userAddressWords.some((userWord) =>
-            categoryAddressWords.includes(userWord)
+            .split(/[\s,]+/);
+          return categoryAddressWords.some((catWord) =>
+            userAddressWords.includes(catWord)
           );
         });
       });

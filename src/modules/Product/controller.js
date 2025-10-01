@@ -1,6 +1,7 @@
 const Product = require("./model"); // Adjust the path as necessary
 const fs = require("fs");
 const path = require("path");
+const Category = require("../Category/model"); // <-- Add this line
 
 // Controller function to add a new product
 exports.addProduct = async (req, res) => {
@@ -328,22 +329,42 @@ exports.getRecentlyAddedProducts = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const userLocation = req.query.userLocation;
+    const userAddress = req.query.userAddress; // Get user address from query
+    console.log("userAddress getRecentlyAddedProducts==>>", userAddress);
 
-    // Construct the filter for availableLocalities
+    let categoryFilter = {};
+    if (userAddress) {
+      const userAddressWords = userAddress.toLowerCase().split(/\s+/);
+      const categories = await Category.find();
+      const filteredCategories = categories.filter((category) => {
+        if (!category.addresses || category.addresses.length === 0) {
+          return false; // Do not include categories with no specified address when a user address is provided
+        }
+        return category.addresses.some((categoryAddress) => {
+          const categoryAddressWords = categoryAddress
+            .toLowerCase()
+            .split(/\s+/);
+          return userAddressWords.some((userWord) =>
+            categoryAddressWords.includes(userWord)
+          );
+        });
+      });
+      const categoryIds = filteredCategories.map((cat) => cat._id);
+      categoryFilter = { category: { $in: categoryIds } };
+    }
+
     const locationFilter = userLocation
       ? { availableLocalities: { $in: [userLocation, "all"] } }
       : {};
 
-    // Find the most recently added products with the location filter
-    const recentlyAddedProducts = await Product.find(locationFilter)
-      .sort({ createdAt: -1 }) // Sort by creation date in descending order
+    const query = { ...locationFilter, ...categoryFilter };
+
+    const recentlyAddedProducts = await Product.find(query)
+      .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
-    // Count the total number of products with the location filter
-    const totalRecentlyAddedProducts = await Product.countDocuments(
-      locationFilter
-    );
+    const totalRecentlyAddedProducts = await Product.countDocuments(query);
 
     res.json({
       total: totalRecentlyAddedProducts,
@@ -362,21 +383,42 @@ exports.getDiscountedProducts = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const userLocation = req.query.userLocation;
+    const userAddress = req.query.userAddress; // Get user address from query
+    console.log("userAddress getDiscountedProducts==>>", userAddress);
 
-    // Construct the filter for availableLocalities
+    let categoryFilter = {};
+    if (userAddress) {
+      const userAddressWords = userAddress.toLowerCase().split(/\s+/);
+      const categories = await Category.find();
+      const filteredCategories = categories.filter((category) => {
+        if (!category.addresses || category.addresses.length === 0) {
+          return false; // Do not include categories with no specified address when a user address is provided
+        }
+        return category.addresses.some((categoryAddress) => {
+          const categoryAddressWords = categoryAddress
+            .toLowerCase()
+            .split(/\s+/);
+          return userAddressWords.some((userWord) =>
+            categoryAddressWords.includes(userWord)
+          );
+        });
+      });
+      const categoryIds = filteredCategories.map((cat) => cat._id);
+      categoryFilter = { category: { $in: categoryIds } };
+    }
+
     const locationFilter = userLocation
       ? { availableLocalities: { $in: [userLocation, "all"] } }
       : {};
 
-    // Combine the discount filter with the location filter
     const query = {
       discount: { $gt: 0 },
       ...locationFilter,
+      ...categoryFilter,
     };
 
-    // Find products that have a discount greater than 0 and match the location filter
     const discountedProducts = await Product.find(query)
-      .sort({ discount: -1 }) // Optionally, sort by the highest discount first
+      .sort({ discount: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
