@@ -228,7 +228,6 @@ exports.createOrder = async (req, res) => {
     }
 
     const customerDetails = await Customer.findById(customer);
-    // console.log("customerDetails--->", customerDetails);
 
     // Validate each vendor and their products
     for (const vendor of vendors) {
@@ -271,40 +270,57 @@ exports.createOrder = async (req, res) => {
           });
         }
         product.quantity -= productInfo.quantity;
-        await product.save();
+        await product.save({ session });
       }
     }
 
     // Save the order to the database
-    const savedOrder = await newOrder.save();
+    const savedOrder = await newOrder.save({ session });
 
-    // Send new order notification email to each vendor
+    // Send new order notification email and SMS to each vendor
     for (const vendor of vendors) {
       const vendorId = new mongoose.Types.ObjectId(vendor.vendor);
 
-      // Fetch the vendor's role using the vendorId
+      // Fetch the vendor's details using the vendorId
       const vendorDetails = await Vendor.findById(vendorId);
 
-      // console.log("vendor.vendor.email-->>", vendorDetails)
+      if (vendorDetails) {
+        // Send email
+        await emailService.sendNewOrderNotificationEmail(
+          vendorDetails.email,
+          savedOrder,
+          customerDetails.contactNumber
+        );
 
-      await emailService.sendNewOrderNotificationEmail(
-        vendorDetails.email,
-        savedOrder,
-        customerDetails.contactNumber
-      );
-    }
+        // Send SMS
+        if (
+          vendorDetails.vendorInfo &&
+          vendorDetails.vendorInfo.contactNumber
+        ) {
+          const API = process.env.SMS_API_KEY;
+          const phoneNumber = vendorDetails.vendorInfo.contactNumber;
+          const otp = "1111"; // Using the static OTP as requested
 
-    const API = process.env.SMS_API_KEY;
-    const phoneNumber = "9554948693";
-    // const phoneNumber = "8882202176";
+          const url = `https://sms.renflair.in/V1.php?API=${API}&PHONE=${phoneNumber}&OTP=${otp}`;
 
-    const otp = "1111";
-
-    const url = `https://sms.renflair.in/V1.php?API=${API}&PHONE=${phoneNumber}&OTP=${otp}`;
-    const smsResponse = await axios.get(url); // Use axios or fetch for making the API call
-
-    if (smsResponse.data.status !== "SUCCESS") {
-      console.error("SMS sending failed", smsResponse.data);
+          try {
+            const smsResponse = await axios.get(url);
+            if (smsResponse.data.status !== "SUCCESS") {
+              console.error(
+                "SMS sending failed for vendor:",
+                vendorDetails._id,
+                smsResponse.data
+              );
+            }
+          } catch (smsError) {
+            console.error(
+              "Error sending SMS to vendor:",
+              vendorDetails._id,
+              smsError.message
+            );
+          }
+        }
+      }
     }
 
     await session.commitTransaction();
