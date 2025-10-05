@@ -690,3 +690,62 @@ exports.getOrdersByCustomerId = async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
+
+exports.getstatsForMonth = async (req, res) => {
+  try {
+    const { month, year } = req.query; // e.g. ?month=11&year=2025
+
+    const stats = await Order.aggregate([
+      // Match orders within given month & year
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(year, month - 1, 1), // 1st of month
+            $lt: new Date(year, month, 1), // 1st of next month
+          },
+        },
+      },
+
+      // Unwind vendors and products
+      { $unwind: "$vendors" },
+      { $unwind: "$vendors.products" },
+
+      // Group all for that month
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $addToSet: "$_id" },
+          totalRevenue: { $sum: "$vendors.products.totalAmount" },
+        },
+      },
+
+      // Final projection
+      {
+        $project: {
+          _id: 0,
+          year: parseInt(year),
+          month: parseInt(month),
+          totalOrders: { $size: "$totalOrders" },
+          totalRevenue: 1,
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: stats[0] || {
+        year: parseInt(year),
+        month: parseInt(month),
+        totalOrders: 0,
+        totalRevenue: 0,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch order stats",
+      error: error.message,
+    });
+  }
+};

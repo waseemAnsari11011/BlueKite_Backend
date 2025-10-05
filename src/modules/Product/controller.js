@@ -334,7 +334,7 @@ exports.getRecentlyAddedProducts = async (req, res) => {
 
     let categoryFilter = {};
     if (userAddress) {
-      const userAddressWords = userAddress.toLowerCase().split(/\s+/);
+      const userAddressWords = userAddress.toLowerCase().split(/[\s,]+/);
       const categories = await Category.find();
       const filteredCategories = categories.filter((category) => {
         if (!category.addresses || category.addresses.length === 0) {
@@ -343,7 +343,7 @@ exports.getRecentlyAddedProducts = async (req, res) => {
         return category.addresses.some((categoryAddress) => {
           const categoryAddressWords = categoryAddress
             .toLowerCase()
-            .split(/\s+/);
+            .split(/[\s,]+/);
           return userAddressWords.some((userWord) =>
             categoryAddressWords.includes(userWord)
           );
@@ -388,7 +388,7 @@ exports.getDiscountedProducts = async (req, res) => {
 
     let categoryFilter = {};
     if (userAddress) {
-      const userAddressWords = userAddress.toLowerCase().split(/\s+/);
+      const userAddressWords = userAddress.toLowerCase().split(/[\s,]+/);
       const categories = await Category.find();
       const filteredCategories = categories.filter((category) => {
         if (!category.addresses || category.addresses.length === 0) {
@@ -397,7 +397,7 @@ exports.getDiscountedProducts = async (req, res) => {
         return category.addresses.some((categoryAddress) => {
           const categoryAddressWords = categoryAddress
             .toLowerCase()
-            .split(/\s+/);
+            .split(/[\s,]+/);
           return userAddressWords.some((userWord) =>
             categoryAddressWords.includes(userWord)
           );
