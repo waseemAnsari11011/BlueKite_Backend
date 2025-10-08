@@ -12,6 +12,9 @@ const customerSchema = new Schema({
   image: {
     type: String,
   },
+  imageS3: {
+    type: String,
+  },
   email: {
     type: String,
     unique: true,

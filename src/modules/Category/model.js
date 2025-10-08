@@ -13,6 +13,9 @@ const categorySchema = new mongoose.Schema(
       type: [String], // Array of strings to store image URLs or paths
       validate: [arrayLimit, "{PATH} exceeds the limit of 10"], // Optional: Limit the number of images
     },
+    imagesS3: {
+      type: [String],
+    },
     addresses: {
       type: [String], // Array of strings to store addresses
     },
