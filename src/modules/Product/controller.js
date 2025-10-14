@@ -330,7 +330,9 @@ exports.getRecentlyAddedProducts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const userLocation = req.query.userLocation;
     const userAddress = req.query.userAddress; // Get user address from query
-    console.log("userAddress getRecentlyAddedProducts==>>", userAddress);
+
+    console.log("userLocation=", userLocation);
+    console.log("userAddress=", userAddress);
 
     let categoryFilter = {};
     if (userAddress) {
@@ -384,7 +386,6 @@ exports.getDiscountedProducts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const userLocation = req.query.userLocation;
     const userAddress = req.query.userAddress; // Get user address from query
-    console.log("userAddress getDiscountedProducts==>>", userAddress);
 
     let categoryFilter = {};
     if (userAddress) {
@@ -437,39 +438,72 @@ exports.getDiscountedProducts = async (req, res) => {
 
 //Fuzzy Search
 // controller.js
+
 exports.fuzzySearchProducts = async (req, res) => {
-  const { searchQuery, page = 1, limit = 10, userLocation } = req.query;
-
   try {
-    // Build the regex query for partial matches
-    const regexQuery = new RegExp(searchQuery, "i"); // 'i' for case-insensitive
+    const { searchQuery, userAddress } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
 
-    // Construct the filter for availableLocalities
-    const locationFilter = userLocation
-      ? { availableLocalities: { $in: [userLocation, "all"] } }
-      : {};
+    console.log("userAddress=", userAddress);
 
-    // Combine the search query with the location filter
-    const query = {
-      ...locationFilter,
+    // This block is essential for your requirement.
+    // If no user address is provided, we don't filter by category address.
+    let categoryFilter = {};
+    if (userAddress) {
+      // 1. FIND MATCHING CATEGORIES
+      // Splits the user's address into words for more flexible matching.
+      const userAddressWords = userAddress.toLowerCase().split(/[\s,]+/);
+      const allCategories = await Category.find({});
+
+      const matchedCategories = allCategories.filter((category) => {
+        // A category must have addresses to be considered for a match.
+        if (!category.addresses || category.addresses.length === 0) {
+          return false;
+        }
+
+        // Check if any of the category's addresses contain any word from the user's address.
+        return category.addresses.some((categoryAddress) => {
+          const categoryAddressWords = categoryAddress
+            .toLowerCase()
+            .split(/[\s,]+/);
+          return userAddressWords.some((userWord) =>
+            categoryAddressWords.includes(userWord)
+          );
+        });
+      });
+
+      // Extract the unique IDs from the categories that matched.
+      const matchedCategoryIds = matchedCategories.map((cat) => cat._id);
+
+      // Prepare the filter to be used in the product query.
+      // This ensures we only look at products within these categories.
+      categoryFilter = { category: { $in: matchedCategoryIds } };
+    }
+
+    const regexQuery = new RegExp(searchQuery, "i");
+
+    // 2. FIND PRODUCTS USING THE CATEGORY FILTER
+    const finalQuery = {
+      ...categoryFilter, // <-- This is the crucial part
       $or: [
         { name: { $regex: regexQuery } },
         { description: { $regex: regexQuery } },
       ],
     };
 
-    // Find products that match the search query in the 'name' or 'description' and match the location filter
-    const results = await Product.find(query);
-    // .skip((page - 1) * limit)
-    // .limit(parseInt(limit));
+    const products = await Product.find(finalQuery)
+      .populate("category") // Optional: to get category details in the response
+      .skip((page - 1) * limit)
+      .limit(limit);
 
-    const totalResults = await Product.countDocuments(query);
+    const totalProducts = await Product.countDocuments(finalQuery);
 
     res.json({
-      total: totalResults,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      products: results,
+      total: totalProducts,
+      page,
+      limit,
+      products,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
