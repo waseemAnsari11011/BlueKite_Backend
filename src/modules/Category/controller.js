@@ -1,88 +1,106 @@
 const Category = require("./model"); // Adjust the path as necessary
 const fs = require("fs");
 const path = require("path");
+const {
+  extractS3KeyFromUrl,
+  deleteS3Objects,
+} = require("../Middleware/s3DeleteUtil");
 
 // Controller function to add a new category
 exports.addCategory = async (req, res) => {
   try {
-    const { name, addresses } = req.body;
-    const images = req.files.map((file) => file.path); // Get the paths of the uploaded images
+    let { name, addresses } = req.body;
 
-    // Create a new category instance
+    // ✅ FIX: Parse the addresses string back into an array
+    if (addresses) {
+      try {
+        addresses = JSON.parse(addresses);
+      } catch (e) {
+        return res.status(400).json({ message: "Invalid addresses format." });
+      }
+    }
+
+    const images = req.files ? req.files.map((file) => file.location) : [];
+
     const newCategory = new Category({
       name,
-      images,
-      addresses: addresses ? JSON.parse(addresses) : [],
+      addresses: addresses,
+      images: images,
     });
 
-    // Save the category to the database
-    const savedCategory = await newCategory.save();
+    await newCategory.save();
 
-    // Send response
     res.status(201).json({
-      message: "Category created successfully",
-      category: savedCategory,
+      message: "Category created successfully!",
+      category: newCategory,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Failed to create category",
-      error: error.message,
-    });
+    console.error("Error creating category:", error);
+    res.status(500).json({ message: "Failed to create category", error });
   }
 };
 
-// Controller function to update an existing category
+// --- UPDATE AN EXISTING CATEGORY ---
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, existingImages, addresses } = req.body;
+    let { name, addresses, existingImages } = req.body; // use let
 
-    // Find the category by ID
     const category = await Category.findById(id);
-
     if (!category) {
-      return res.status(404).json({
-        message: "Category not found",
-      });
+      return res.status(404).json({ message: "Category not found" });
     }
 
-    // Delete category images from the file system that are not in existingImages
-    category.images.forEach((imagePath) => {
-      if (!existingImages?.includes(imagePath)) {
-        const fullPath = path.join(imagePath);
-        fs.unlink(fullPath, (err) => {
-          if (err) {
-            console.error(`Failed to delete image file: ${fullPath}`, err);
-          }
-        });
+    // ✅ FIX: Parse the addresses string back into an array
+    if (addresses) {
+      try {
+        addresses = JSON.parse(addresses);
+      } catch (e) {
+        return res.status(400).json({ message: "Invalid addresses format." });
       }
-    });
+    }
 
-    // Update the category details
+    // --- Handle Image Deletion ---
+    const currentImages = category.images || [];
+    const imagesToKeep = existingImages
+      ? Array.isArray(existingImages)
+        ? existingImages
+        : [existingImages]
+      : currentImages;
+
+    const imagesToDelete = currentImages.filter(
+      (url) => !imagesToKeep.includes(url)
+    );
+
+    if (imagesToDelete.length > 0) {
+      const keysToDelete = imagesToDelete
+        .map(extractS3KeyFromUrl)
+        .filter((key) => key);
+      if (keysToDelete.length > 0) {
+        await deleteS3Objects(keysToDelete);
+      }
+    }
+
+    // --- Handle New Image Uploads ---
+    const newImageLocations = req.files
+      ? req.files.map((file) => file.location)
+      : [];
+
+    // --- Update the document ---
     category.name = name || category.name;
-    category.addresses = addresses ? JSON.parse(addresses) : category.addresses;
+    if (addresses) category.addresses = addresses; // Now 'addresses' is a proper array
 
-    // Combine existing images and new uploaded images
-    const newImages = req.files.map((file) => file.path);
-    category.images = existingImages
-      ? existingImages.concat(newImages)
-      : newImages;
+    category.images = [...imagesToKeep, ...newImageLocations];
 
-    // Save the updated category to the database
-    const updatedCategory = await category.save();
+    await category.save();
 
-    // Send response
     res.status(200).json({
-      message: "Category updated successfully",
-      category: updatedCategory,
+      message: "Category updated successfully!",
+      category,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Failed to update category",
-      error: error.message,
-    });
+    console.error("Error updating category:", error);
+    res.status(500).json({ message: "Failed to update category", error });
   }
 };
 

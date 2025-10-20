@@ -2,12 +2,13 @@ const Product = require("./model"); // Adjust the path as necessary
 const fs = require("fs");
 const path = require("path");
 const Category = require("../Category/model"); // <-- Add this line
+const {
+  deleteS3Objects,
+  extractS3KeyFromUrl,
+} = require("../Middleware/s3DeleteUtil");
 
 // Controller function to add a new product
 exports.addProduct = async (req, res) => {
-  console.log("Request body:", req.body);
-  console.log("Uploaded files:", req.files);
-
   try {
     const {
       name,
@@ -19,11 +20,10 @@ exports.addProduct = async (req, res) => {
       availableLocalities,
       quantity,
     } = req.body;
-    const images = req.files.map((file) => file.path); // Get the paths of the uploaded images
 
-    console.log("vendor--->>>", vendor);
+    // ✅ Get the S3 URLs from the middleware's result (file.location)
+    const images = req.files ? req.files.map((file) => file.location) : [];
 
-    // Create a new product instance
     const newProduct = new Product({
       name,
       images,
@@ -32,14 +32,14 @@ exports.addProduct = async (req, res) => {
       description,
       category,
       vendor,
-      availableLocalities,
+      availableLocalities: Array.isArray(availableLocalities)
+        ? availableLocalities
+        : [availableLocalities],
       quantity,
     });
 
-    // Save the product to the database
     const savedProduct = await newProduct.save();
 
-    // Send response
     res.status(201).json({
       message: "Product created successfully",
       product: savedProduct,
@@ -141,55 +141,54 @@ exports.updateProduct = async (req, res) => {
       quantity,
     } = req.body;
 
-    // console.log("existingImages-->>", existingImages)
-
-    // Find the product by ID
     const product = await Product.findById(id);
 
     if (!product) {
-      return res.status(404).json({
-        message: "Product not found",
-      });
+      return res.status(404).json({ message: "Product not found" });
     }
 
-    // Delete product images from the file system that are not in existingImages
-    product.images.forEach((imagePath) => {
-      if (!existingImages?.includes(imagePath)) {
-        // console.log("Deleting imagePath-->>", imagePath);
-        const fullPath = path.join(imagePath); // Adjust the path accordingly
-        fs.unlink(fullPath, (err) => {
-          if (err) {
-            console.error(`Failed to delete image file: ${fullPath}`, err);
-          }
-        });
-      }
-    });
+    // ✅ --- S3 Image Deletion Logic ---
+    const currentImages = product.images || [];
+    const imagesToKeep = existingImages
+      ? Array.isArray(existingImages)
+        ? existingImages
+        : [existingImages]
+      : [];
+    const imagesToDelete = currentImages.filter(
+      (url) => !imagesToKeep.includes(url)
+    );
 
-    // Update the product details
+    if (imagesToDelete.length > 0) {
+      const keysToDelete = imagesToDelete
+        .map(extractS3KeyFromUrl)
+        .filter((key) => key);
+      if (keysToDelete.length > 0) {
+        await deleteS3Objects(keysToDelete);
+      }
+    }
+
+    // --- Update product details ---
     product.name = name || product.name;
-    product.price = price || product.price;
-    product.discount = discount || product.discount;
+    product.price = price !== undefined ? price : product.price;
+    product.discount = discount !== undefined ? discount : product.discount;
     product.description = description || product.description;
     product.category = category || product.category;
     product.vendor = vendor || product.vendor;
-    product.availableLocalities =
-      availableLocalities || product.availableLocalities;
-    product.quantity = quantity || product.quantity;
+    product.availableLocalities = availableLocalities
+      ? Array.isArray(availableLocalities)
+        ? availableLocalities
+        : [availableLocalities]
+      : product.availableLocalities;
+    product.quantity = quantity !== undefined ? quantity : product.quantity;
 
-    // Combine existing images and new uploaded images if there are new images
-    if (req.files && req.files.length > 0) {
-      const newImages = req?.files?.map((file) => file.path);
-      product.images = existingImages
-        ? existingImages?.concat(newImages)
-        : newImages;
-    } else {
-      product.images = existingImages || product.images;
-    }
+    // ✅ Get new image locations from S3 middleware
+    const newImageLocations = req.files
+      ? req.files.map((file) => file.location)
+      : [];
+    product.images = [...imagesToKeep, ...newImageLocations];
 
-    // Save the updated product to the database
     const updatedProduct = await product.save();
 
-    // Send response
     res.status(200).json({
       message: "Product updated successfully",
       product: updatedProduct,
@@ -207,40 +206,30 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Find the product by ID
     const product = await Product.findById(id);
 
     if (!product) {
-      return res.status(404).json({
-        message: "Product not found",
-      });
+      return res.status(404).json({ message: "Product not found" });
     }
 
-    // Delete product images from the file system
-    product.images.forEach((imagePath) => {
-      const fullPath = path.join(imagePath);
-      fs.unlink(fullPath, (err) => {
-        if (err) {
-          console.error(`Failed to delete image file: ${fullPath}`, err);
-        }
-      });
-    });
+    // Delete images from S3
+    if (product.images && product.images.length > 0) {
+      const keysToDelete = product.images
+        .map(extractS3KeyFromUrl)
+        .filter((key) => key);
+      if (keysToDelete.length > 0) {
+        await deleteS3Objects(keysToDelete);
+      }
+    }
 
-    // Delete the product from the database
-    const deletedProduct = await Product.findByIdAndDelete(id);
+    await Product.findByIdAndDelete(id);
 
-    // Send response confirming deletion
-    res.status(200).json({
-      message: "Product deleted successfully",
-      product: deletedProduct,
-    });
+    res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      message: "Failed to delete product",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({ message: "Failed to delete product", error: error.message });
   }
 };
 

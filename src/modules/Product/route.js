@@ -1,21 +1,43 @@
-const express = require('express');
+// Product/route.js
+const express = require("express");
 const router = express.Router();
-const upload = require('../Middleware/uploadHandler'); // Adjust the path as necessary
-const productController = require('./controller'); // Adjust the path as necessary
+// const upload = require('../Middleware/uploadHandler'); // REMOVE THIS
+const handleS3Upload = require("../Middleware/s3UploadHandler"); // ✅ ADD THIS
+const productController = require("./controller");
 
-// Route to add a new product with file upload middleware
-router.post('/products', upload('uploads/products'), productController.addProduct);
-router.put('/products/:id', upload('uploads/products'), productController.updateProduct);
-router.delete('/products/:id', productController.deleteProduct);
-router.get('/products/:vendorId', productController.getAllProducts);
-router.get('/products-low-quantity/:vendorId', productController.getProductsLowQuantity);
+const S3_FOLDER = "products";
+const FILE_FIELD_NAME = "images";
 
-router.get('/single-product/:id', productController.getProductById);
+// ✅ Use the S3 upload middleware
+router.post(
+  "/products",
+  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME),
+  productController.addProduct
+);
+router.put(
+  "/products/:id",
+  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME),
+  productController.updateProduct
+);
 
-router.get('/categories/:id/products', productController.getProductsByCategoryId);
-router.get('/products/:id/similar', productController.getSimilarProducts);
-router.get('/recentlyAddedProducts', productController.getRecentlyAddedProducts);
-router.get('/onDiscountProducts', productController.getDiscountedProducts);
-router.get('/searchProducts', productController.fuzzySearchProducts);
+// --- Other routes remain the same ---
+router.delete("/products/:id", productController.deleteProduct);
+router.get("/products/:vendorId", productController.getAllProducts);
+router.get(
+  "/products-low-quantity/:vendorId",
+  productController.getProductsLowQuantity
+);
+router.get("/single-product/:id", productController.getProductById);
+router.get(
+  "/categories/:id/products",
+  productController.getProductsByCategoryId
+);
+router.get("/products/:id/similar", productController.getSimilarProducts);
+router.get(
+  "/recentlyAddedProducts",
+  productController.getRecentlyAddedProducts
+);
+router.get("/onDiscountProducts", productController.getDiscountedProducts);
+router.get("/searchProducts", productController.fuzzySearchProducts);
 
 module.exports = router;

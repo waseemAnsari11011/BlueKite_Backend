@@ -13,9 +13,7 @@ const productSchema = new mongoose.Schema(
       type: [String], // Array of strings to store image URLs or paths
       validate: [arrayLimit, "{PATH} exceeds the limit of 10"], // Optional: Limit the number of images
     },
-    imagesS3: {
-      type: [String],
-    },
+
     price: {
       type: Number,
       required: true,
