@@ -1,7 +1,11 @@
 const Vendor = require("./model.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-
+// ✅ Import S3 delete utils
+const {
+  deleteS3Objects,
+  extractS3KeyFromUrl,
+} = require("../Middleware/s3DeleteUtil");
 require("dotenv").config();
 const secret = process.env.JWT_SECRET;
 
@@ -57,33 +61,94 @@ exports.getVendorById = async (req, res) => {
 
 // Controller function to update a vendor by ID
 exports.updateVendor = async (req, res) => {
-  const updates = Object.keys(req.body);
-  const allowedUpdates = [
-    "name",
-    "passwordHash",
-    "email",
-    "vendorInfo",
-    "availableCities",
-  ];
-  const isValidOperation = updates.every((update) =>
-    allowedUpdates.includes(update)
-  );
-
-  if (!isValidOperation) {
-    return res.status(400).send({ error: "Invalid updates!" });
+  // 1. Security Check
+  if (req.user.id !== req.params.id && req.user.role !== "admin") {
+    return res
+      .status(403)
+      .send({ error: "Access denied. You can only update your own account." });
   }
 
   try {
+    // 2. Find Vendor
     const vendor = await Vendor.findById(req.params.id);
     if (!vendor) {
-      return res.status(404).send();
+      return res.status(404).send({ error: "Vendor not found" });
     }
 
-    updates.forEach((update) => (vendor[update] = req.body[update]));
-    await vendor.save();
-    res.status(200).send(vendor);
+    // 3. Handle Shop Image Updates
+    const { existingShopImages } = req.body;
+    const currentImages = vendor.shopImages || [];
+
+    const imagesToKeep = existingShopImages
+      ? Array.isArray(existingShopImages)
+        ? existingShopImages
+        : [existingShopImages]
+      : [];
+
+    const imagesToDelete = currentImages.filter(
+      (url) => !imagesToKeep.includes(url)
+    );
+
+    if (imagesToDelete.length > 0) {
+      const keysToDelete = imagesToDelete
+        .map(extractS3KeyFromUrl)
+        .filter((key) => key);
+      if (keysToDelete.length > 0) {
+        await deleteS3Objects(keysToDelete);
+      }
+    }
+
+    const newImageLocations = req.files
+      ? req.files.map((file) => file.location)
+      : [];
+
+    vendor.shopImages = [...imagesToKeep, ...newImageLocations];
+
+    // 4. Handle Text & Other Data Updates
+    let { name, email, vendorInfo, password } = req.body;
+
+    if (name) vendor.name = name;
+    if (email) vendor.email = email;
+
+    // --- START: Parse vendorInfo from formData ---
+    if (vendorInfo) {
+      try {
+        const parsedVendorInfo = JSON.parse(vendorInfo);
+
+        // Ensure vendorInfo object exists before assigning
+        if (!vendor.vendorInfo) {
+          vendor.vendorInfo = {};
+        }
+
+        // Check and assign properties individually
+        if (parsedVendorInfo.businessName !== undefined) {
+          vendor.vendorInfo.businessName = parsedVendorInfo.businessName;
+        }
+        if (parsedVendorInfo.contactNumber !== undefined) {
+          vendor.vendorInfo.contactNumber = parsedVendorInfo.contactNumber;
+        }
+      } catch (e) {
+        console.error("Failed to parse vendorInfo:", e);
+        return res.status(400).send({ error: "Invalid vendorInfo format." });
+      }
+    }
+    // --- END: Parse vendorInfo ---
+
+    // 5. Handle Password Update
+    if (password) {
+      vendor.password = await bcrypt.hash(password, 10);
+    }
+
+    // 6. Save and Respond
+    const updatedVendor = await vendor.save();
+
+    // Return the updated vendor (which includes the new shopImages array)
+    res.status(200).send(updatedVendor);
   } catch (error) {
-    res.status(400).send(error);
+    console.error("Error updating vendor:", error);
+    res
+      .status(400)
+      .send({ error: "Failed to update vendor", details: error.message });
   }
 };
 
@@ -115,11 +180,9 @@ exports.vendorLogin = async (req, res) => {
 
     // Check if the vendor is restricted
     if (vendor.isRestricted) {
-      return res
-        .status(403)
-        .json({
-          message: "Your account is restricted. Please contact support.",
-        });
+      return res.status(403).json({
+        message: "Your account is restricted. Please contact support.",
+      });
     }
 
     // Check if password matches

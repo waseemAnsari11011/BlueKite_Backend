@@ -16,6 +16,10 @@ const vendorSchema = new Schema({
     required: true,
     unique: true,
   },
+  shopImages: {
+    type: [String], // Array of S3 URLs
+    default: [],
+  },
   vendorInfo: {
     businessName: {
       type: String,
