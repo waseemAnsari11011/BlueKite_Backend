@@ -707,6 +707,14 @@ exports.getstatsForMonth = async (req, res) => {
 
       // Unwind vendors and products
       { $unwind: "$vendors" },
+
+      // Filter out cancelled vendor orders
+      {
+        $match: {
+          "vendors.orderStatus": { $ne: "Cancelled" },
+        },
+      },
+
       { $unwind: "$vendors.products" },
 
       // Group all for that month
