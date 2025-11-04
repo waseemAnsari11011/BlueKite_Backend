@@ -14,6 +14,7 @@ const FaqsRoutes = require("./src/modules/HelpCenter/route");
 const ContactRoutes = require("./src/modules/Contactus/route");
 const BannerRoutes = require("./src/modules/Banner/route");
 const DeliveryRoutes = require("./src/modules/Delivery/route");
+const notificationRoutes = require("./src/modules/Notification/route");
 
 const app = express();
 app.use(cors());
@@ -46,6 +47,7 @@ app.use("/api/", FaqsRoutes);
 app.use("/api/", ContactRoutes);
 app.use("/api/", BannerRoutes);
 app.use("/api/", DeliveryRoutes);
+app.use("/api/notification", notificationRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
