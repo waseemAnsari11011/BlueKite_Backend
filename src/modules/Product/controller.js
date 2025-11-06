@@ -21,21 +21,29 @@ exports.addProduct = async (req, res) => {
       quantity,
     } = req.body;
 
+    // ✅ --- QUICK FIX STARTS HERE ---
+    // If price or discount are falsy (null, undefined, "", 0),
+    // default them to 0. This prevents 'null' from being saved.
+    const priceToSave = price || 0;
+    const discountToSave = discount || 0;
+    const quantityToSave = quantity || 0;
+    // ✅ --- QUICK FIX ENDS HERE ---
+
     // ✅ Get the S3 URLs from the middleware's result (file.location)
     const images = req.files ? req.files.map((file) => file.location) : [];
 
     const newProduct = new Product({
       name,
       images,
-      price,
-      discount,
+      price: priceToSave, // Use the fixed value
+      discount: discountToSave, // Use the fixed value
       description,
       category,
       vendor,
       availableLocalities: Array.isArray(availableLocalities)
         ? availableLocalities
         : [availableLocalities],
-      quantity,
+      quantity: quantityToSave, // Use the fixed value
     });
 
     const savedProduct = await newProduct.save();
@@ -169,8 +177,16 @@ exports.updateProduct = async (req, res) => {
 
     // --- Update product details ---
     product.name = name || product.name;
-    product.price = price !== undefined ? price : product.price;
-    product.discount = discount !== undefined ? discount : product.discount;
+
+    // ✅ --- QUICK FIX STARTS HERE ---
+    // The original logic (price !== undefined) allowed 'null' to be saved.
+    // We change the check to (price != null), which checks for BOTH null and undefined.
+    // This prevents 'null' from being saved, but allows 0 to be saved.
+    product.price = price != null ? price : product.price;
+    product.discount = discount != null ? discount : product.discount;
+    product.quantity = quantity != null ? quantity : product.quantity;
+    // ✅ --- QUICK FIX ENDS HERE ---
+
     product.description = description || product.description;
     product.category = category || product.category;
     product.vendor = vendor || product.vendor;
@@ -179,7 +195,6 @@ exports.updateProduct = async (req, res) => {
         ? availableLocalities
         : [availableLocalities]
       : product.availableLocalities;
-    product.quantity = quantity !== undefined ? quantity : product.quantity;
 
     // ✅ Get new image locations from S3 middleware
     const newImageLocations = req.files

@@ -8,7 +8,13 @@ if (!admin.apps.length) {
   });
 }
 
-const sendPushNotification = async (deviceTokens, title, body, data = {}) => {
+const sendPushNotification = async (
+  deviceTokens,
+  title,
+  body,
+  data = {},
+  imageUrl = null
+) => {
   if (!deviceTokens || !title || !body) {
     throw new Error("Device token(s), title, and body are required");
   }
@@ -19,12 +25,44 @@ const sendPushNotification = async (deviceTokens, title, body, data = {}) => {
     stringifiedData[key] = String(data[key]);
   });
 
+  // Build notification object with optional image
+  const notificationPayload = {
+    title,
+    body,
+  };
+
+  // Add image URL if provided
+  if (imageUrl) {
+    notificationPayload.imageUrl = imageUrl;
+  }
+
   // Handle single token
   if (typeof deviceTokens === "string") {
     const message = {
-      notification: { title, body },
+      notification: notificationPayload,
       data: stringifiedData,
       token: deviceTokens,
+      // Android specific configuration for images
+      android: imageUrl
+        ? {
+            notification: {
+              imageUrl: imageUrl,
+            },
+          }
+        : undefined,
+      // iOS specific configuration for images
+      apns: imageUrl
+        ? {
+            payload: {
+              aps: {
+                "mutable-content": 1,
+              },
+            },
+            fcm_options: {
+              image: imageUrl,
+            },
+          }
+        : undefined,
     };
 
     try {
@@ -65,9 +103,30 @@ const sendPushNotification = async (deviceTokens, title, body, data = {}) => {
       const batch = validTokens.slice(i, i + batchSize);
 
       const messages = batch.map((token) => ({
-        notification: { title, body },
+        notification: notificationPayload,
         data: stringifiedData,
         token: token,
+        // Android specific configuration for images
+        android: imageUrl
+          ? {
+              notification: {
+                imageUrl: imageUrl,
+              },
+            }
+          : undefined,
+        // iOS specific configuration for images
+        apns: imageUrl
+          ? {
+              payload: {
+                aps: {
+                  "mutable-content": 1,
+                },
+              },
+              fcm_options: {
+                image: imageUrl,
+              },
+            }
+          : undefined,
       }));
 
       try {

@@ -4,15 +4,16 @@ const notificationSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     body: { type: String, required: true },
+    imageUrl: { type: String, default: null }, // S3 image URL
     sender: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Vendor", // It will always reference the Vendor model
+      ref: "Vendor",
       required: true,
     },
     senderModel: {
       type: String,
       required: true,
-      enum: ["Vendor"], // This makes it clear
+      enum: ["Vendor"],
       default: "Vendor",
     },
     targetAudience: {
@@ -20,6 +21,19 @@ const notificationSchema = new mongoose.Schema(
       enum: ["all"],
       default: "all",
     },
+    recipientCount: {
+      type: Number,
+      default: 0,
+    }, // Number of recipients who received the notification
+    isResend: {
+      type: Boolean,
+      default: false,
+    }, // Flag to indicate if this is a resent notification
+    originalNotificationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Notification",
+      default: null,
+    }, // Reference to original notification if resent
   },
   { timestamps: true }
 );
