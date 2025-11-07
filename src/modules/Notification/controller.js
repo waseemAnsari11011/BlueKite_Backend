@@ -13,6 +13,11 @@ exports.sendNotificationToAll = async (req, res) => {
 
     console.log("senderId===>>>", senderId);
 
+    // DEBUG: Check what's in the request
+    console.log("req.file===>>>", req.file);
+    console.log("req.files===>>>", req.files);
+    console.log("req.body===>>>", req.body);
+
     if (!title || !body) {
       return res
         .status(400)
@@ -21,9 +26,17 @@ exports.sendNotificationToAll = async (req, res) => {
 
     // Get image URL from uploaded file (if any)
     let imageUrl = null;
-    if (req.files && req.files.length > 0) {
+    if (req.file) {
+      // Single file upload uses req.file
+      imageUrl = req.file.location;
+      console.log("imageUrl from req.file===>>>", imageUrl);
+    } else if (req.files && req.files.length > 0) {
+      // Multiple files upload uses req.files
       imageUrl = req.files[0].location;
+      console.log("imageUrl from req.files===>>>", imageUrl);
     }
+
+    console.log("Final imageUrl===>>>", imageUrl);
 
     // 1. Get all customer FCM tokens
     const customers = await Customer.find({ fcmDeviceToken: { $ne: null } })

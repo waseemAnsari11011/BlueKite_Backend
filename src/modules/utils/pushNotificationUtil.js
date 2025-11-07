@@ -31,9 +31,9 @@ const sendPushNotification = async (
     body,
   };
 
-  // Add image URL if provided
+  // Add image to notification payload if provided
   if (imageUrl) {
-    notificationPayload.imageUrl = imageUrl;
+    notificationPayload.image = imageUrl; // Changed from imageUrl to image
   }
 
   // Handle single token
@@ -42,15 +42,15 @@ const sendPushNotification = async (
       notification: notificationPayload,
       data: stringifiedData,
       token: deviceTokens,
-      // Android specific configuration for images
+      // Android specific configuration
       android: imageUrl
         ? {
             notification: {
-              imageUrl: imageUrl,
+              image: imageUrl, // Changed from imageUrl to image
             },
           }
         : undefined,
-      // iOS specific configuration for images
+      // iOS specific configuration
       apns: imageUrl
         ? {
             payload: {
@@ -106,15 +106,15 @@ const sendPushNotification = async (
         notification: notificationPayload,
         data: stringifiedData,
         token: token,
-        // Android specific configuration for images
+        // Android specific configuration
         android: imageUrl
           ? {
               notification: {
-                imageUrl: imageUrl,
+                image: imageUrl, // Changed from imageUrl to image
               },
             }
           : undefined,
-        // iOS specific configuration for images
+        // iOS specific configuration
         apns: imageUrl
           ? {
               payload: {

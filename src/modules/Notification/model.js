@@ -10,12 +10,6 @@ const notificationSchema = new mongoose.Schema(
       ref: "Vendor",
       required: true,
     },
-    senderModel: {
-      type: String,
-      required: true,
-      enum: ["Vendor"],
-      default: "Vendor",
-    },
     targetAudience: {
       type: String,
       enum: ["all"],
