@@ -1,17 +1,22 @@
 const Category = require("./model"); // Adjust the path as necessary
-const fs = require("fs");
-const path = require("path");
 const {
   extractS3KeyFromUrl,
   deleteS3Objects,
 } = require("../Middleware/s3DeleteUtil");
 
-// Controller function to add a new category
+// Controller function to add a new category (now linked to a vendor)
 exports.addCategory = async (req, res) => {
+  console.log("addCategory is called");
   try {
     let { name, addresses } = req.body;
+    const vendorId = req.user.id; // 👈 Get vendor ID from token
 
-    // ✅ FIX: Parse the addresses string back into an array
+    if (!vendorId) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: No user ID in token." });
+    }
+
     if (addresses) {
       try {
         addresses = JSON.parse(addresses);
@@ -24,6 +29,7 @@ exports.addCategory = async (req, res) => {
 
     const newCategory = new Category({
       name,
+      vendor: vendorId, // 👈 Assign ownership
       addresses: addresses,
       images: images,
     });
@@ -35,23 +41,37 @@ exports.addCategory = async (req, res) => {
       category: newCategory,
     });
   } catch (error) {
+    // Handle the unique index error (vendor + name)
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Failed to create category. You already have a category with this name.",
+      });
+    }
     console.error("Error creating category:", error);
     res.status(500).json({ message: "Failed to create category", error });
   }
 };
 
-// --- UPDATE AN EXISTING CATEGORY ---
+// --- UPDATE AN EXISTING CATEGORY (with ownership check) ---
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    let { name, addresses, existingImages } = req.body; // use let
+    const vendorId = req.user.id; // 👈 Get vendor ID from token
+    let { name, addresses, existingImages } = req.body;
 
     const category = await Category.findById(id);
     if (!category) {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    // ✅ FIX: Parse the addresses string back into an array
+    // ⛔ OWNERSHIP CHECK
+    if (category.vendor.toString() !== vendorId) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: You do not own this category." });
+    }
+
     if (addresses) {
       try {
         addresses = JSON.parse(addresses);
@@ -88,8 +108,7 @@ exports.updateCategory = async (req, res) => {
 
     // --- Update the document ---
     category.name = name || category.name;
-    if (addresses) category.addresses = addresses; // Now 'addresses' is a proper array
-
+    if (addresses) category.addresses = addresses;
     category.images = [...imagesToKeep, ...newImageLocations];
 
     await category.save();
@@ -99,42 +118,31 @@ exports.updateCategory = async (req, res) => {
       category,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Failed to update category. You already have another category with this name.",
+      });
+    }
     console.error("Error updating category:", error);
     res.status(500).json({ message: "Failed to update category", error });
   }
 };
 
-// Controller function to get all categories
+// Controller function to get all categories FOR THE LOGGED-IN VENDOR
 exports.getAllCategory = async (req, res) => {
   try {
-    const { userAddress } = req.query;
-    console.log("userAddress==>>", userAddress);
+    const vendorId = req.user.id; // 👈 Get vendor ID from token
 
-    let categories = await Category.find();
+    // 👈 Find only categories that belong to this vendor
+    const categories = await Category.find({ vendor: vendorId });
 
-    if (userAddress) {
-      const userAddressWords = userAddress.toLowerCase().split(/[\s,]+/);
+    // The 'userAddress' logic is removed as this is now a
+    // private route for a vendor to get their *own* categories.
+    // A public search route would be separate.
 
-      categories = categories.filter((category) => {
-        if (!category.addresses || category.addresses.length === 0) {
-          // If a user address is provided, categories without a specific address should not be shown.
-          return false;
-        }
-        // Check if any of the category's address keywords are in the user's address
-        return category.addresses.some((categoryAddress) => {
-          const categoryAddressWords = categoryAddress
-            .toLowerCase()
-            .split(/[\s,]+/);
-          return categoryAddressWords.some((catWord) =>
-            userAddressWords.includes(catWord)
-          );
-        });
-      });
-    }
-
-    // Send the categories in the response
     res.status(200).json({
-      message: "Categories retrieved successfully",
+      message: "Your categories retrieved successfully",
       categories,
     });
   } catch (error) {
@@ -146,18 +154,25 @@ exports.getAllCategory = async (req, res) => {
   }
 };
 
-// Controller function to get a category by ID
+// Controller function to get a category by ID (with ownership check)
 exports.getCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
+    const vendorId = req.user.id; // 👈 Get vendor ID from token
 
-    // Find the category by ID
     const category = await Category.findById(id);
 
     if (!category) {
       return res.status(404).json({
         message: "Category not found",
       });
+    }
+
+    // ⛔ OWNERSHIP CHECK
+    if (category.vendor.toString() !== vendorId) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: You do not own this category." });
     }
 
     // Send the category in the response
@@ -174,34 +189,46 @@ exports.getCategoryById = async (req, res) => {
   }
 };
 
-// Controller function to delete a category by ID
+// Controller function to delete a category by ID (with ownership check)
 exports.deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    const vendorId = req.user.id; // 👈 Get vendor ID from token
 
-    // Find and delete the category by ID
-    const deletedCategory = await Category.findByIdAndDelete(id);
+    // Find the category first to check ownership
+    const category = await Category.findById(id);
 
-    if (!deletedCategory) {
+    if (!category) {
       return res.status(404).json({
         message: "Category not found",
       });
     }
 
-    // Delete category images from the file system
-    deletedCategory.images.forEach((imagePath) => {
-      const fullPath = path.join(imagePath);
-      fs.unlink(fullPath, (err) => {
-        if (err) {
-          console.error(`Failed to delete image file: ${fullPath}`, err);
-        }
-      });
-    });
+    // ⛔ OWNERSHIP CHECK
+    if (category.vendor.toString() !== vendorId) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: You do not own this category." });
+    }
 
-    // Send response confirming deletion
+    // --- ✅ FIX: Delete images from S3, not filesystem ---
+    // Your old code used 'fs.unlink', which is for local files.
+    // This uses the same S3 logic from your 'updateCategory' function.
+    if (category.images && category.images.length > 0) {
+      const keysToDelete = category.images
+        .map(extractS3KeyFromUrl)
+        .filter((key) => key);
+      if (keysToDelete.length > 0) {
+        await deleteS3Objects(keysToDelete);
+      }
+    }
+
+    // Now, delete the category from the database
+    await Category.findByIdAndDelete(id);
+
     res.status(200).json({
       message: "Category deleted successfully",
-      category: deletedCategory,
+      category: category, // Send back the category that was deleted
     });
   } catch (error) {
     console.error(error);

@@ -10,7 +10,19 @@ const S3_FOLDER = "shop_images";
 const FILE_FIELD_NAME = "shopImages";
 
 // Route to create a new vendor
-router.post("/vendors/signup", vendorController.createVendor);
+router.post(
+  "/vendors/signup",
+  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME),
+  vendorController.createVendor
+);
+
+// Route to update a vendor by ID
+router.put(
+  "/vendors/:id",
+  authenticateToken,
+  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME), // ✅ Add S3 middleware
+  vendorController.updateVendor
+);
 
 // Route to get all vendors
 router.get(
@@ -22,14 +34,6 @@ router.get(
 
 // Route to get a vendor by ID
 router.get("/vendors/:id", vendorController.getVendorById);
-
-// Route to update a vendor by ID
-router.put(
-  "/vendors/:id",
-  authenticateToken,
-  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME), // ✅ Add S3 middleware
-  vendorController.updateVendor
-);
 
 //Restrict Vendor
 router.put(

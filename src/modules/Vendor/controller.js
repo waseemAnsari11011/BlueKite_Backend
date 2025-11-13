@@ -12,50 +12,48 @@ const secret = process.env.JWT_SECRET;
 // Controller function to create a new vendor
 exports.createVendor = async (req, res) => {
   try {
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    // 1. Get file locations from S3 middleware (if any)
+    const shopImageLocations = req.files
+      ? req.files.map((file) => file.location)
+      : [];
 
-    // Create a new vendor with the hashed password
+    // 2. Get text data from req.body
+    const { name, password, email, vendorInfo } = req.body;
+
+    // 3. Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 4. Parse vendorInfo (it's stringified JSON from FormData)
+    let parsedVendorInfo = {};
+    if (vendorInfo) {
+      try {
+        parsedVendorInfo = JSON.parse(vendorInfo);
+      } catch (e) {
+        console.error("Failed to parse vendorInfo:", e);
+        return res.status(400).send({ error: "Invalid vendorInfo format." });
+      }
+    }
+
+    // 5. Create a new vendor
     const newVendor = new Vendor({
-      name: req.body.name,
+      name: name,
       password: hashedPassword,
-      email: req.body.email,
-      vendorInfo: req.body.vendorInfo,
+      email: email,
+      vendorInfo: {
+        businessName: parsedVendorInfo.businessName,
+        contactNumber: parsedVendorInfo.contactNumber,
+      },
+      shopImages: shopImageLocations, // <-- Add the new images
       role: "vendor",
     });
 
-    // Save the new vendor to the database
+    // 6. Save the new vendor to the database
     await newVendor.save();
 
     res.status(201).send(newVendor);
   } catch (error) {
     console.log("error===>>", error);
     res.status(400).send(error);
-  }
-};
-
-// Controller to fetch all vendors with role 'vendor'
-exports.getAllVendors = async (req, res) => {
-  try {
-    // Fetch only vendors with the role 'vendor'
-    const vendors = await Vendor.find({ role: "vendor" });
-    console.log("vendors api", vendors);
-    res.status(200).send(vendors);
-  } catch (error) {
-    res.status(500).send(error);
-  }
-};
-
-// Controller function to get a vendor by ID
-exports.getVendorById = async (req, res) => {
-  try {
-    const vendor = await Vendor.findById(req.params.id);
-    if (!vendor) {
-      return res.status(404).send();
-    }
-    res.status(200).send(vendor);
-  } catch (error) {
-    res.status(500).send(error);
   }
 };
 
@@ -152,19 +150,6 @@ exports.updateVendor = async (req, res) => {
   }
 };
 
-// Controller function to delete a vendor by ID
-exports.deleteVendor = async (req, res) => {
-  try {
-    const vendor = await Vendor.findByIdAndDelete(req.params.id);
-    if (!vendor) {
-      return res.status(404).send();
-    }
-    res.status(200).send(vendor);
-  } catch (error) {
-    res.status(500).send(error);
-  }
-};
-
 // Controller function for vendor login
 exports.vendorLogin = async (req, res) => {
   const { email, password } = req.body;
@@ -202,6 +187,44 @@ exports.vendorLogin = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Controller to fetch all vendors with role 'vendor'
+exports.getAllVendors = async (req, res) => {
+  try {
+    // Fetch only vendors with the role 'vendor'
+    const vendors = await Vendor.find({ role: "vendor" });
+    console.log("vendors api", vendors);
+    res.status(200).send(vendors);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+};
+
+// Controller function to get a vendor by ID
+exports.getVendorById = async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).send();
+    }
+    res.status(200).send(vendor);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+};
+
+// Controller function to delete a vendor by ID
+exports.deleteVendor = async (req, res) => {
+  try {
+    const vendor = await Vendor.findByIdAndDelete(req.params.id);
+    if (!vendor) {
+      return res.status(404).send();
+    }
+    res.status(200).send(vendor);
+  } catch (error) {
+    res.status(500).send(error);
   }
 };
 
