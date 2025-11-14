@@ -1,9 +1,5 @@
 const admin = require("firebase-admin");
 const serviceAccount = require("../../../firebaseConfig.json");
-// --- 1. IMPORT THE ERROR MODEL ---
-const PushNotificationError = require("../PushNotificationError/model");
-// --- 2. IMPORT THE CUSTOMER MODEL ---
-const Customer = require("../Customer/model");
 
 // Initialize Firebase Admin SDK (only once)
 if (!admin.apps.length) {
@@ -11,59 +7,6 @@ if (!admin.apps.length) {
     credential: admin.credential.cert(serviceAccount),
   });
 }
-
-/**
- * Saves a notification error to the database.
- * This runs asynchronously in the background ("fire and forget")
- * to avoid slowing down the main notification function.
- */
-const logErrorToDB = (error, notification, token) => {
-  // We use an async IIFE (Immediately Invoked Function Expression)
-  // to perform async actions (like finding a customer)
-  // without forcing the caller to use 'await'.
-  (async () => {
-    try {
-      const logPayload = {
-        error: {
-          code: error.code,
-          message: error.message,
-        },
-        notification: {
-          title: notification.title,
-          body: notification.body,
-          imageUrl: notification.image || null,
-        },
-        token: token,
-      };
-
-      // --- 3. TRY TO FIND THE CUSTOMER ID ---
-      // Find the customer who has this fcmDeviceToken
-      const customer = await Customer.findOne({ fcmDeviceToken: token })
-        .select("_id")
-        .lean();
-
-      if (customer) {
-        logPayload.customer = customer._id;
-      }
-      // --- END OF CHANGE ---
-
-      // Create and save the error log
-      const errorLog = new PushNotificationError(logPayload);
-      await errorLog.save();
-    } catch (dbError) {
-      // If saving the log fails, just log to console.
-      // We don't want a log failure to crash the app.
-      console.error(
-        "CRITICAL: Failed to save notification error to database:",
-        dbError
-      );
-      console.error("Original notification error was:", {
-        error: { code: error.code, message: error.message },
-        token,
-      });
-    }
-  })(); // <-- Immediately invoke the async function
-};
 
 const sendPushNotification = async (
   deviceTokens,
@@ -142,9 +85,7 @@ const sendPushNotification = async (
         failureCount: 0,
       };
     } catch (error) {
-      // --- 4. USE THE UPDATED LOGGER ---
-      logErrorToDB(error, notificationPayload, deviceTokens);
-
+      console.error("Error sending message:", error.code, error.message);
       return {
         success: false,
         error: error,
@@ -245,8 +186,11 @@ const sendPushNotification = async (
               const errorCode = resp.error?.code;
               const token = batch[idx];
 
-              // --- 5. USE THE UPDATED LOGGER ---
-              logErrorToDB(resp.error, notificationPayload, token);
+              console.error(
+                `Failed to send to token ${token.substring(0, 20)}...:`,
+                errorCode,
+                resp.error?.message
+              );
 
               // Track invalid tokens for database cleanup
               if (isInvalidToken(resp.error)) {
@@ -256,12 +200,7 @@ const sendPushNotification = async (
           });
         }
       } catch (error) {
-        // --- 6. USE THE UPDATED LOGGER ---
-        logErrorToDB(
-          error,
-          notificationPayload,
-          `CRITICAL_BATCH_ERROR: ${batch.length} tokens`
-        );
+        console.error("Error sending batch:", error.message);
         totalFailure += batch.length;
       }
     }
