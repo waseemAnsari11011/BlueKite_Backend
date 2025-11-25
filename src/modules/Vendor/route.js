@@ -31,7 +31,6 @@ router.get(
 // Route to get a vendor by ID (Parameterized - Must be after specific GET routes)
 router.get("/vendors/:id", vendorController.getVendorById);
 
-
 // --- POST Routes ---
 
 // Route to create a new vendor
@@ -43,7 +42,6 @@ router.post(
 
 // Route for vendor login
 router.post("/vendors/login", vendorController.vendorLogin);
-
 
 // --- PUT Routes ---
 
@@ -70,7 +68,6 @@ router.put(
   handleS3Upload(S3_FOLDER, FILE_FIELD_NAME),
   vendorController.updateVendor
 );
-
 
 // --- DELETE Routes ---
 

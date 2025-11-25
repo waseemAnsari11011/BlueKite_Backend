@@ -359,7 +359,9 @@ exports.getRecentlyAddedProducts = async (req, res) => {
         });
       });
       const categoryIds = filteredCategories.map((cat) => cat._id);
-      categoryFilter = { category: { $in: categoryIds } };
+      if (categoryIds.length > 0) {
+        categoryFilter = { category: { $in: categoryIds } };
+      }
     }
 
     const locationFilter = userLocation
@@ -412,7 +414,9 @@ exports.getDiscountedProducts = async (req, res) => {
         });
       });
       const categoryIds = filteredCategories.map((cat) => cat._id);
-      categoryFilter = { category: { $in: categoryIds } };
+      if (categoryIds.length > 0) {
+        categoryFilter = { category: { $in: categoryIds } };
+      }
     }
 
     const locationFilter = userLocation
