@@ -46,4 +46,7 @@ router.get(
   categoryController.getCategoryById
 );
 
+// Route to get categories by vendor ID (public)
+router.get("/category/vendor/:vendorId", categoryController.getVendorCategories);
+
 module.exports = router;

@@ -255,20 +255,23 @@ exports.getProductsByCategoryId = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const userLocation = req.query.userLocation;
+    const vendorId = req.query.vendorId;
+
+    const query = {
+      category: categoryId,
+    };
+
+    if (vendorId) {
+      query.vendor = vendorId;
+    }
 
     // Find all products that belong to the given category ID and filter by userLocation
-    const products = await Product.find({
-      category: categoryId,
-      availableLocalities: { $in: [userLocation, "all"] },
-    })
+    const products = await Product.find(query)
       .skip((page - 1) * limit)
       .limit(limit);
 
     // Count the total number of products in the category with the specified location filter
-    const totalProducts = await Product.countDocuments({
-      category: categoryId,
-      availableLocalities: { $in: [userLocation, "all"] },
-    });
+    const totalProducts = await Product.countDocuments(query);
 
     // Send the products in the response with pagination metadata
     res.status(200).json({

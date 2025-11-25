@@ -39,7 +39,18 @@ const customerSchema = new Schema({
     postalCode: {
       type: String,
     },
+
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+      },
+    },
   },
+
   availableLocalities: {
     type: String,
   },

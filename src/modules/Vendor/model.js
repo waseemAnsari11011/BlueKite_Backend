@@ -45,7 +45,26 @@ const vendorSchema = new Schema({
       postalCode: {
         type: String,
       },
+      location: {
+        type: {
+          type: String,
+          enum: ["Point"], // 'location.type' must be 'Point'
+          default: "Point",
+        },
+        coordinates: {
+          type: [Number], // [longitude, latitude]
+          default: [0, 0],
+        },
+      },
     },
+  },
+  serviceRadius: {
+    type: Number, // Service radius in kilometers
+    default: 5, // Default service radius (e.g., 5km)
+  },
+  isOperational: {
+    type: Boolean, // Is the vendor open and accepting orders?
+    default: true,
   },
   role: {
     type: String,
@@ -70,6 +89,9 @@ vendorSchema.methods.comparePassword = async function (candidatePassword) {
   console.log("candidatePassword", candidatePassword);
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+// Add 2dsphere index
+vendorSchema.index({ "vendorInfo.address.location": "2dsphere" });
 
 // Create the model
 const Vendor = mongoose.model("Vendor", vendorSchema);

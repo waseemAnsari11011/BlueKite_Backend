@@ -9,22 +9,18 @@ const handleS3Upload = require("../Middleware/s3UploadHandler");
 const S3_FOLDER = "shop_images";
 const FILE_FIELD_NAME = "shopImages";
 
-// Route to create a new vendor
-router.post(
-  "/vendors/signup",
-  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME),
-  vendorController.createVendor
-);
+// --- GET Routes ---
 
-// Route to update a vendor by ID
-router.put(
-  "/vendors/:id",
-  authenticateToken,
-  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME), // ✅ Add S3 middleware
-  vendorController.updateVendor
-);
+// Route to get vendors near a specific location (Specific)
+router.get("/vendors/nearme", vendorController.getVendorsNearMe);
 
-// Route to get all vendors
+// Route to get vendors with discounted products
+router.get("/vendors/discounted", vendorController.getDiscountedVendors);
+
+// Route to get new arrival vendors
+router.get("/vendors/new-arrivals", vendorController.getNewArrivalVendors);
+
+// Route to get all vendors (Specific)
 router.get(
   "/vendors",
   authenticateToken,
@@ -32,10 +28,26 @@ router.get(
   vendorController.getAllVendors
 );
 
-// Route to get a vendor by ID
+// Route to get a vendor by ID (Parameterized - Must be after specific GET routes)
 router.get("/vendors/:id", vendorController.getVendorById);
 
-//Restrict Vendor
+
+// --- POST Routes ---
+
+// Route to create a new vendor
+router.post(
+  "/vendors/signup",
+  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME),
+  vendorController.createVendor
+);
+
+// Route for vendor login
+router.post("/vendors/login", vendorController.vendorLogin);
+
+
+// --- PUT Routes ---
+
+// Restrict Vendor (Specific path)
 router.put(
   "/vendors/restrict/:id",
   authenticateToken,
@@ -43,7 +55,7 @@ router.put(
   vendorController.restrictVendor
 );
 
-//UnRestrict Vendor
+// UnRestrict Vendor (Specific path)
 router.put(
   "/vendors/unrestrict/:id",
   authenticateToken,
@@ -51,10 +63,18 @@ router.put(
   vendorController.unRestrictVendor
 );
 
+// Route to update a vendor by ID (Parameterized - Must be after specific PUT routes)
+router.put(
+  "/vendors/:id",
+  authenticateToken,
+  handleS3Upload(S3_FOLDER, FILE_FIELD_NAME),
+  vendorController.updateVendor
+);
+
+
+// --- DELETE Routes ---
+
 // Route to delete a vendor by ID
 router.delete("/vendors/:id", vendorController.deleteVendor);
-
-// Route for vendor login
-router.post("/vendors/login", vendorController.vendorLogin);
 
 module.exports = router;

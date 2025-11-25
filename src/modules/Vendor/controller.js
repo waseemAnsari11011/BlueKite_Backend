@@ -1,4 +1,5 @@
 const Vendor = require("./model.js");
+const Product = require("../Product/model");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 // ✅ Import S3 delete utils
@@ -8,6 +9,14 @@ const {
 } = require("../Middleware/s3DeleteUtil");
 require("dotenv").config();
 const secret = process.env.JWT_SECRET;
+
+const NodeGeocoder = require("node-geocoder");
+const options = {
+  provider: "google",
+  apiKey: process.env.GOOGLE_MAPS_API_KEY, // From your .env file
+  formatter: null,
+};
+const geocoder = NodeGeocoder(options);
 
 // Controller function to create a new vendor
 exports.createVendor = async (req, res) => {
@@ -34,6 +43,33 @@ exports.createVendor = async (req, res) => {
       }
     }
 
+    // --- NEW: Geocode Address ---
+    let location = {
+      type: "Point",
+      coordinates: [0, 0], // Default
+    };
+
+    // Extract address from parsedVendorInfo
+    const { address } = parsedVendorInfo;
+
+    if (address && address.addressLine1 && address.postalCode) {
+      try {
+        const fullAddress = `${address.addressLine1}, ${address.city}, ${address.state} ${address.postalCode}, ${address.country}`;
+        const geoResult = await geocoder.geocode(fullAddress);
+
+        if (geoResult && geoResult.length > 0) {
+          location.coordinates = [
+            geoResult[0].longitude,
+            geoResult[0].latitude,
+          ];
+        }
+      } catch (geoError) {
+        console.error("Geocoding failed:", geoError.message);
+        // Don't block registration, just log the error and save with default [0,0]
+      }
+    }
+    // --- END NEW ---
+
     // 5. Create a new vendor
     const newVendor = new Vendor({
       name: name,
@@ -42,9 +78,16 @@ exports.createVendor = async (req, res) => {
       vendorInfo: {
         businessName: parsedVendorInfo.businessName,
         contactNumber: parsedVendorInfo.contactNumber,
+        businessName: parsedVendorInfo.businessName,
+        contactNumber: parsedVendorInfo.contactNumber,
+        address: {
+          ...parsedVendorInfo.address,
+          location: location, // <-- Save the geocoded location inside address
+        },
       },
-      shopImages: shopImageLocations, // <-- Add the new images
+      shopImages: shopImageLocations,
       role: "vendor",
+      // serviceRadius and isOperational will use the defaults from your model
     });
 
     // 6. Save the new vendor to the database
@@ -53,6 +96,10 @@ exports.createVendor = async (req, res) => {
     res.status(201).send(newVendor);
   } catch (error) {
     console.log("error===>>", error);
+    // Handle duplicate email error
+    if (error.code === 11000) {
+      return res.status(400).send({ error: "Email already exists." });
+    }
     res.status(400).send(error);
   }
 };
@@ -76,12 +123,19 @@ exports.updateVendor = async (req, res) => {
     // 3. Handle Shop Image Updates
     const { existingShopImages } = req.body;
     const currentImages = vendor.shopImages || [];
+    let imagesToKeep;
 
-    const imagesToKeep = existingShopImages
-      ? Array.isArray(existingShopImages)
-        ? existingShopImages
-        : [existingShopImages]
-      : [];
+    // Fix for partial updates (e.g. serviceRadius only):
+    // If request is NOT multipart and existingShopImages is undefined, preserve current images.
+    if (!req.is('multipart/form-data') && existingShopImages === undefined) {
+      imagesToKeep = currentImages;
+    } else {
+      imagesToKeep = existingShopImages
+        ? Array.isArray(existingShopImages)
+          ? existingShopImages
+          : [existingShopImages]
+        : [];
+    }
 
     const imagesToDelete = currentImages.filter(
       (url) => !imagesToKeep.includes(url)
@@ -103,10 +157,11 @@ exports.updateVendor = async (req, res) => {
     vendor.shopImages = [...imagesToKeep, ...newImageLocations];
 
     // 4. Handle Text & Other Data Updates
-    let { name, email, vendorInfo, password } = req.body;
+    let { name, email, vendorInfo, password, serviceRadius } = req.body;
 
     if (name) vendor.name = name;
     if (email) vendor.email = email;
+    if (serviceRadius) vendor.serviceRadius = serviceRadius;
 
     // --- START: Parse vendorInfo from formData ---
     if (vendorInfo) {
@@ -125,6 +180,42 @@ exports.updateVendor = async (req, res) => {
         if (parsedVendorInfo.contactNumber !== undefined) {
           vendor.vendorInfo.contactNumber = parsedVendorInfo.contactNumber;
         }
+
+        // --- NEW: Handle Address Update & Geocoding ---
+        if (parsedVendorInfo.address) {
+          const { address } = parsedVendorInfo;
+          
+          // Initialize location with default or existing values
+          let location = {
+             type: "Point",
+             coordinates: [0, 0]
+          };
+
+          // If we have a valid address to geocode
+          if (address.addressLine1 && address.postalCode) {
+            try {
+              const fullAddress = `${address.addressLine1}, ${address.city}, ${address.state} ${address.postalCode}, ${address.country}`;
+              const geoResult = await geocoder.geocode(fullAddress);
+
+              if (geoResult && geoResult.length > 0) {
+                location.coordinates = [
+                  geoResult[0].longitude,
+                  geoResult[0].latitude,
+                ];
+              }
+            } catch (geoError) {
+              console.error("Geocoding failed during update:", geoError.message);
+              // Keep default [0,0] or handle as needed
+            }
+          }
+
+          // Update the address object in vendorInfo
+          vendor.vendorInfo.address = {
+            ...address,
+            location: location
+          };
+        }
+        // --- END NEW ---
       } catch (e) {
         console.error("Failed to parse vendorInfo:", e);
         return res.status(400).send({ error: "Invalid vendorInfo format." });
@@ -289,5 +380,125 @@ exports.unRestrictVendor = async (req, res) => {
       message: "Failed to unrestrict vendor",
       error: error.message,
     });
+  }
+};
+
+// Controller function to get vendors near a customer
+exports.getVendorsNearMe = async (req, res) => {
+  console.log("it is called!!");
+  const { lat, long } = req.query;
+
+  if (!lat || !long) {
+    return res
+      .status(400)
+      .send({ error: "Latitude and longitude are required." });
+  }
+
+  const latitude = parseFloat(lat);
+  const longitude = parseFloat(long);
+
+  // Max distance in meters (e.g., 10km)
+  // This can be dynamic later
+  const maxDistance = 10000;
+
+  try {
+    const vendors = await Vendor.find({
+      "vendorInfo.address.location": {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [longitude, latitude], // MongoDB requires [longitude, latitude]
+          },
+          $maxDistance: maxDistance, // Distance in meters
+        },
+      },
+      isOperational: true, // Only show open vendors
+      role: { $in: ["vendor", "admin"] },
+    });
+
+    res.status(200).send(vendors);
+  } catch (error) {
+    console.error("Error finding vendors near_me:", error);
+    res.status(500).send({ message: error.message, error: error });
+  }
+};
+
+// Controller function to get vendors with discounted products
+exports.getDiscountedVendors = async (req, res) => {
+  try {
+    const { lat, long } = req.query;
+
+    // 1. Find all products with a discount > 0
+    const discountedProducts = await Product.find({ discount: { $gt: 0 } }).select("vendor");
+    
+    // 2. Extract unique vendor IDs
+    const vendorIds = [...new Set(discountedProducts.map(p => p.vendor.toString()))];
+
+    let query = {
+      _id: { $in: vendorIds },
+      role: { $in: ["vendor", "admin"] },
+      isOperational: true
+    };
+
+    // 3. If location is provided, filter by proximity
+    if (lat && long) {
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(long);
+      const maxDistance = 10000; // 10km
+
+      query["vendorInfo.address.location"] = {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [longitude, latitude],
+          },
+          $maxDistance: maxDistance,
+        },
+      };
+    }
+
+    const vendors = await Vendor.find(query);
+
+    res.status(200).json(vendors);
+  } catch (error) {
+    console.error("Error fetching discounted vendors:", error);
+    res.status(500).json({ message: "Failed to fetch discounted vendors", error: error.message });
+  }
+};
+
+// Controller function to get new arrival vendors
+exports.getNewArrivalVendors = async (req, res) => {
+  try {
+    const { lat, long } = req.query;
+
+    let query = {
+      role: { $in: ["vendor", "admin"] },
+      isOperational: true
+    };
+
+    // If location is provided, filter by proximity
+    if (lat && long) {
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(long);
+      const maxDistance = 10000; // 10km
+
+      query["vendorInfo.address.location"] = {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [longitude, latitude],
+          },
+          $maxDistance: maxDistance,
+        },
+      };
+    }
+
+    // Fetch vendors sorted by createdAt descending
+    const vendors = await Vendor.find(query).sort({ createdAt: -1 });
+
+    res.status(200).json(vendors);
+  } catch (error) {
+    console.error("Error fetching new arrival vendors:", error);
+    res.status(500).json({ message: "Failed to fetch new arrival vendors", error: error.message });
   }
 };

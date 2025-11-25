@@ -238,3 +238,21 @@ exports.deleteCategory = async (req, res) => {
     });
   }
 };
+
+// Controller function to get categories by vendor ID (public)
+exports.getVendorCategories = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const categories = await Category.find({ vendor: vendorId });
+    res.status(200).json({
+      message: "Vendor categories retrieved successfully",
+      categories,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Failed to retrieve vendor categories",
+      error: error.message,
+    });
+  }
+};
