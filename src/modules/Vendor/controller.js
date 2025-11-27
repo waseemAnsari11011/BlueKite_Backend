@@ -2,6 +2,7 @@ const Vendor = require("./model.js");
 const Product = require("../Product/model");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 // ✅ Import S3 delete utils
 const {
   deleteS3Objects,
@@ -387,6 +388,7 @@ exports.unRestrictVendor = async (req, res) => {
 exports.getVendorsNearMe = async (req, res) => {
   console.log("it is called!!");
   const { lat, long } = req.query;
+  console.log(`Request Params - Lat: ${lat}, Long: ${long}`);
 
   if (!lat || !long) {
     return res
@@ -397,24 +399,54 @@ exports.getVendorsNearMe = async (req, res) => {
   const latitude = parseFloat(lat);
   const longitude = parseFloat(long);
 
-  // Max distance in meters (e.g., 10km)
-  // This can be dynamic later
-  const maxDistance = 10000;
+  if (isNaN(latitude) || isNaN(longitude)) {
+    return res.status(400).send({ error: "Invalid latitude or longitude." });
+  }
 
   try {
-    const vendors = await Vendor.find({
-      "vendorInfo.address.location": {
-        $near: {
-          $geometry: {
+    // DEBUG: Dump all vendors to see what's in the DB
+    const allVendorsInDb = await Vendor.find({});
+    console.log(`--- DEBUG: Dumping ${allVendorsInDb.length} Vendors from DB ---`);
+    allVendorsInDb.forEach(v => {
+      const loc = v.vendorInfo?.address?.location;
+      console.log(`ID: ${v._id}, Name: ${v.name}`);
+      console.log(`   Coords: ${JSON.stringify(loc?.coordinates)}, Type: ${loc?.type}`);
+      console.log(`   isOperational: ${v.isOperational}, Role: ${v.role}, ServiceRadius: ${v.serviceRadius}`);
+    });
+    console.log("------------------------------------------------");
+
+    // 1. Get all nearby vendors without filtering by radius yet
+    const allNearbyVendors = await Vendor.aggregate([
+      {
+        $geoNear: {
+          near: {
             type: "Point",
-            coordinates: [longitude, latitude], // MongoDB requires [longitude, latitude]
+            coordinates: [longitude, latitude],
           },
-          $maxDistance: maxDistance, // Distance in meters
+          key: "vendorInfo.address.location",
+          distanceField: "distance",
+          spherical: true,
+          query: {
+            isOperational: true,
+            role: { $in: ["vendor", "admin"] },
+          },
         },
       },
-      isOperational: true, // Only show open vendors
-      role: { $in: ["vendor", "admin"] },
+      // Removed $match stage to debug
+    ]);
+
+    console.log(`Found ${allNearbyVendors.length} vendors nearby (via $geoNear):`);
+    allNearbyVendors.forEach(v => {
+      console.log(`- Vendor: ${v.name}, Dist: ${v.distance.toFixed(2)}m, Radius: ${v.serviceRadius}km`);
     });
+
+    // 2. Filter in JS
+    const vendors = allNearbyVendors.filter(v => {
+      const radiusInMeters = (v.serviceRadius || 5) * 1000;
+      return v.distance <= radiusInMeters;
+    });
+
+    console.log(`Returning ${vendors.length} vendors after radius filter.`);
 
     res.status(200).send(vendors);
   } catch (error) {
@@ -431,33 +463,52 @@ exports.getDiscountedVendors = async (req, res) => {
     // 1. Find all products with a discount > 0
     const discountedProducts = await Product.find({ discount: { $gt: 0 } }).select("vendor");
     
-    // 2. Extract unique vendor IDs
-    const vendorIds = [...new Set(discountedProducts.map(p => p.vendor.toString()))];
+    // 2. Extract unique vendor IDs and cast to ObjectId
+    const vendorIds = [...new Set(discountedProducts.map(p => p.vendor.toString()))].map(id => new mongoose.Types.ObjectId(id));
 
-    let query = {
-      _id: { $in: vendorIds },
-      role: { $in: ["vendor", "admin"] },
-      isOperational: true
-    };
+    let vendors;
 
-    // 3. If location is provided, filter by proximity
+    // 3. If location is provided, filter by proximity and service radius
     if (lat && long) {
       const latitude = parseFloat(lat);
       const longitude = parseFloat(long);
-      const maxDistance = 10000; // 10km
 
-      query["vendorInfo.address.location"] = {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [longitude, latitude],
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ message: "Invalid latitude or longitude." });
+      }
+
+      vendors = await Vendor.aggregate([
+        {
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: [longitude, latitude],
+            },
+            key: "vendorInfo.address.location",
+            distanceField: "distance",
+            spherical: true,
+            query: {
+              _id: { $in: vendorIds },
+              isOperational: true,
+              role: { $in: ["vendor", "admin"] },
+            },
           },
-          $maxDistance: maxDistance,
         },
-      };
+        {
+          $match: {
+            $expr: {
+              $lte: ["$distance", { $multiply: [{ $ifNull: ["$serviceRadius", 5] }, 1000] }],
+            },
+          },
+        },
+      ]);
+    } else {
+      vendors = await Vendor.find({
+        _id: { $in: vendorIds },
+        role: { $in: ["vendor", "admin"] },
+        isOperational: true
+      });
     }
-
-    const vendors = await Vendor.find(query);
 
     res.status(200).json(vendors);
   } catch (error) {
@@ -470,31 +521,51 @@ exports.getDiscountedVendors = async (req, res) => {
 exports.getNewArrivalVendors = async (req, res) => {
   try {
     const { lat, long } = req.query;
+    let vendors;
 
-    let query = {
-      role: { $in: ["vendor", "admin"] },
-      isOperational: true
-    };
-
-    // If location is provided, filter by proximity
+    // If location is provided, filter by proximity and service radius
     if (lat && long) {
       const latitude = parseFloat(lat);
       const longitude = parseFloat(long);
-      const maxDistance = 10000; // 10km
 
-      query["vendorInfo.address.location"] = {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [longitude, latitude],
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ message: "Invalid latitude or longitude." });
+      }
+
+      vendors = await Vendor.aggregate([
+        {
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: [longitude, latitude],
+            },
+            key: "vendorInfo.address.location",
+            distanceField: "distance",
+            spherical: true,
+            query: {
+              isOperational: true,
+              role: { $in: ["vendor", "admin"] },
+            },
           },
-          $maxDistance: maxDistance,
         },
-      };
+        {
+          $match: {
+            $expr: {
+              $lte: ["$distance", { $multiply: [{ $ifNull: ["$serviceRadius", 5] }, 1000] }],
+            },
+          },
+        },
+        {
+          $sort: { createdAt: -1 }
+        }
+      ]);
+    } else {
+      // Fetch vendors sorted by createdAt descending
+      vendors = await Vendor.find({
+        role: { $in: ["vendor", "admin"] },
+        isOperational: true
+      }).sort({ createdAt: -1 });
     }
-
-    // Fetch vendors sorted by createdAt descending
-    const vendors = await Vendor.find(query).sort({ createdAt: -1 });
 
     res.status(200).json(vendors);
   } catch (error) {
