@@ -3,7 +3,7 @@ const router = express.Router();
 const orderController = require("../Order/controller"); // Adjust the path according to your project structure
 
 // Create a new order
-router.get("/order/getStats", orderController.getstatsForMonth);
+router.get("/order/getStats", orderController.getStatsForDateRange);
 
 router.post("/order", orderController.createOrder);
 router.post("/razorpay", orderController.createOrderRazorpay);

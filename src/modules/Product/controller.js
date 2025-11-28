@@ -335,11 +335,26 @@ exports.getRecentlyAddedProducts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const userLocation = req.query.userLocation;
-    const userAddress = req.query.userAddress; // Get user address from query
+    const { userLocation, userAddress, lat, long, vendorIds } = req.query;
 
     console.log("userLocation=", userLocation);
     console.log("userAddress=", userAddress);
+    console.log("vendorIds=", vendorIds);
+
+    let vendorFilter = {};
+
+    if (vendorIds) {
+      // If vendorIds are provided (comma separated), use them directly
+      const ids = vendorIds.split(",");
+      vendorFilter = { vendor: { $in: ids } };
+    } else if (lat && long) {
+      // Fallback to proximity if no vendorIds but lat/long provided
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(long);
+      // Proximity logic would go here, e.g., finding vendors near lat/long
+      // For now, we'll leave it as an empty filter if no vendorIds are present
+      // and no specific proximity logic is implemented yet.
+    }
 
     let categoryFilter = {};
     if (userAddress) {
@@ -368,7 +383,7 @@ exports.getRecentlyAddedProducts = async (req, res) => {
       ? { availableLocalities: { $in: [userLocation, "all"] } }
       : {};
 
-    const query = { ...locationFilter, ...categoryFilter };
+    const query = { ...locationFilter, ...categoryFilter, ...vendorFilter };
 
     const recentlyAddedProducts = await Product.find(query)
       .sort({ createdAt: -1 })
@@ -393,8 +408,21 @@ exports.getDiscountedProducts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const userLocation = req.query.userLocation;
-    const userAddress = req.query.userAddress; // Get user address from query
+    const { userLocation, userAddress, lat, long, vendorIds } = req.query;
+    console.log("getDiscountedProducts params:", { userLocation, userAddress, lat, long, vendorIds });
+
+    let vendorFilter = {};
+    if (vendorIds) {
+      // If vendorIds are provided (comma separated), use them directly
+      const ids = vendorIds.split(",");
+      vendorFilter = { vendor: { $in: ids } };
+    } else if (lat && long) {
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(long);
+      // Proximity logic would go here, e.g., finding vendors near lat/long
+      // For now, we'll leave it as an empty filter if no vendorIds are present
+      // and no specific proximity logic is implemented yet.
+    }
 
     let categoryFilter = {};
     if (userAddress) {
@@ -427,7 +455,9 @@ exports.getDiscountedProducts = async (req, res) => {
       discount: { $gt: 0 },
       ...locationFilter,
       ...categoryFilter,
+      ...vendorFilter,
     };
+    console.log("getDiscountedProducts query:", JSON.stringify(query));
 
     const discountedProducts = await Product.find(query)
       .sort({ discount: -1 })

@@ -690,48 +690,66 @@ exports.getOrdersByCustomerId = async (req, res) => {
   }
 };
 
-exports.getstatsForMonth = async (req, res) => {
+exports.getStatsForDateRange = async (req, res) => {
   try {
-    const { month, year } = req.query; // e.g. ?month=11&year=2025
+    const { from, to } = req.query; // e.g. ?from=2025-11-01&to=2025-11-27
+
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide both 'from' and 'to' dates.",
+      });
+    }
+
+    // 1. Set Start Date (00:00:00)
+    const startDate = new Date(from);
+    startDate.setHours(0, 0, 0, 0);
+
+    // 2. Set End Date (23:59:59) - Inclusive of the last day
+    const endDate = new Date(to);
+    endDate.setHours(23, 59, 59, 999);
 
     const stats = await Order.aggregate([
-      // Match orders within given month & year
+      // 1. Match orders within the date range first (Optimization)
       {
         $match: {
           createdAt: {
-            $gte: new Date(year, month - 1, 1), // 1st of month
-            $lt: new Date(year, month, 1), // 1st of next month
+            $gte: startDate,
+            $lte: endDate,
           },
         },
       },
 
-      // Unwind vendors and products
+      // 2. Unwind vendors to filter specific vendor statuses
+      // (Since an order can have multiple vendors with different statuses)
       { $unwind: "$vendors" },
 
-      // Filter out cancelled vendor orders
+      // 3. FILTER: Only allow 'Delivered' orders
       {
         $match: {
-          "vendors.orderStatus": { $ne: "Cancelled" },
+          "vendors.orderStatus": "Delivered",
         },
       },
 
+      // 4. Unwind products to calculate revenue
       { $unwind: "$vendors.products" },
 
-      // Group all for that month
+      // 5. Group to calculate totals
       {
         $group: {
           _id: null,
+          // count distinct orders (in case multiple vendors in one order are delivered)
           totalOrders: { $addToSet: "$_id" },
           totalRevenue: { $sum: "$vendors.products.totalAmount" },
         },
       },
 
-      // Final projection
+      // 6. Format the output
       {
         $project: {
           _id: 0,
-          year: parseInt(year),
-          month: parseInt(month),
+          from: from,
+          to: to,
           totalOrders: { $size: "$totalOrders" },
           totalRevenue: 1,
         },
@@ -741,8 +759,8 @@ exports.getstatsForMonth = async (req, res) => {
     res.status(200).json({
       success: true,
       data: stats[0] || {
-        year: parseInt(year),
-        month: parseInt(month),
+        from,
+        to,
         totalOrders: 0,
         totalRevenue: 0,
       },
