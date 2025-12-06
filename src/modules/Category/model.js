@@ -24,9 +24,6 @@ const categorySchema = new Schema(
     imagesS3: {
       type: [String],
     },
-    addresses: {
-      type: [String], // Array of strings to store addresses
-    },
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt timestamps

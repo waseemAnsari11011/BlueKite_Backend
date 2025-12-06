@@ -8,7 +8,7 @@ const {
 exports.addCategory = async (req, res) => {
   console.log("addCategory is called");
   try {
-    let { name, addresses } = req.body;
+    const { name } = req.body;
     const vendorId = req.user.id; // 👈 Get vendor ID from token
 
     if (!vendorId) {
@@ -17,20 +17,11 @@ exports.addCategory = async (req, res) => {
         .json({ message: "Forbidden: No user ID in token." });
     }
 
-    if (addresses) {
-      try {
-        addresses = JSON.parse(addresses);
-      } catch (e) {
-        return res.status(400).json({ message: "Invalid addresses format." });
-      }
-    }
-
     const images = req.files ? req.files.map((file) => file.location) : [];
 
     const newCategory = new Category({
       name,
       vendor: vendorId, // 👈 Assign ownership
-      addresses: addresses,
       images: images,
     });
 
@@ -58,7 +49,7 @@ exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
     const vendorId = req.user.id; // 👈 Get vendor ID from token
-    let { name, addresses, existingImages } = req.body;
+    let { name, existingImages } = req.body;
 
     const category = await Category.findById(id);
     if (!category) {
@@ -70,14 +61,6 @@ exports.updateCategory = async (req, res) => {
       return res
         .status(403)
         .json({ message: "Forbidden: You do not own this category." });
-    }
-
-    if (addresses) {
-      try {
-        addresses = JSON.parse(addresses);
-      } catch (e) {
-        return res.status(400).json({ message: "Invalid addresses format." });
-      }
     }
 
     // --- Handle Image Deletion ---
@@ -108,7 +91,6 @@ exports.updateCategory = async (req, res) => {
 
     // --- Update the document ---
     category.name = name || category.name;
-    if (addresses) category.addresses = addresses;
     category.images = [...imagesToKeep, ...newImageLocations];
 
     await category.save();

@@ -29,6 +29,10 @@ const productSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    foodPreparationTime: {
+      type: Number, // Time in minutes
+      default: 0,
+    },
     description: {
       type: String,
       trim: true,

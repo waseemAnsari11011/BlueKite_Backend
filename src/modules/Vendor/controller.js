@@ -8,6 +8,8 @@ const {
   deleteS3Objects,
   extractS3KeyFromUrl,
 } = require("../Middleware/s3DeleteUtil");
+const crypto = require("crypto");
+const { sendResetPasswordEmail } = require("../utils/emailService");
 require("dotenv").config();
 const secret = process.env.JWT_SECRET;
 
@@ -571,5 +573,67 @@ exports.getNewArrivalVendors = async (req, res) => {
   } catch (error) {
     console.error("Error fetching new arrival vendors:", error);
     res.status(500).json({ message: "Failed to fetch new arrival vendors", error: error.message });
+  }
+};
+
+// Forgot Password
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const vendor = await Vendor.findOne({ email });
+    if (!vendor) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(20).toString("hex");
+
+    // Set token and expiry (1 hour)
+    vendor.resetPasswordToken = token;
+    vendor.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+
+    await vendor.save();
+
+    // Create reset URL (Frontend URL)
+    // Assuming frontend is running on localhost:3000 or similar for now, or just sending the token
+    // Ideally this should be an environment variable like FRONTEND_URL
+    const resetUrl = `http://localhost:3000/#/reset-password/${token}`;
+
+    await sendResetPasswordEmail(vendor.email, resetUrl);
+
+    res.status(200).json({ message: "Password reset email sent" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  try {
+    const vendor = await Vendor.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!vendor) {
+      return res.status(400).json({ message: "Password reset token is invalid or has expired" });
+    }
+
+    // Hash new password
+    vendor.password = await bcrypt.hash(password, 10);
+    vendor.resetPasswordToken = undefined;
+    vendor.resetPasswordExpires = undefined;
+
+    await vendor.save();
+
+    res.status(200).json({ message: "Password has been reset" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };

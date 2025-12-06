@@ -80,3 +80,25 @@ exports.sendNewOrderNotificationEmail = async (
     throw error;
   }
 };
+
+exports.sendResetPasswordEmail = async (email, resetUrl) => {
+  const mailOptions = {
+    from: process.env.EMAIL,
+    to: email,
+    subject: "Password Reset Request",
+    html: `
+      <p>You requested a password reset.</p>
+      <p>Click this link to reset your password:</p>
+      <a href="${resetUrl}">${resetUrl}</a>
+      <p>If you didn't request this, please ignore this email.</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log("Password reset email sent");
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
+    throw error;
+  }
+};

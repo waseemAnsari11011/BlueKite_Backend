@@ -43,6 +43,12 @@ router.post(
 // Route for vendor login
 router.post("/vendors/login", vendorController.vendorLogin);
 
+// Route for forgot password
+router.post("/vendors/forgot-password", vendorController.forgotPassword);
+
+// Route for reset password
+router.post("/vendors/reset-password/:token", vendorController.resetPassword);
+
 // --- PUT Routes ---
 
 // Restrict Vendor (Specific path)

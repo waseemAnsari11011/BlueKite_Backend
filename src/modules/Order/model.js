@@ -54,6 +54,9 @@ const orderSchema = new Schema({
         enum: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"],
         default: "Pending",
       },
+      estimatedDeliveryDate: {
+        type: Date,
+      },
     },
   ],
   shippingAddress: {
@@ -76,6 +79,15 @@ const orderSchema = new Schema({
     postalCode: {
       type: String,
       required: true,
+    },
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+      },
     },
   },
   isPaymentVerified: {

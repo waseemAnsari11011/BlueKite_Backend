@@ -547,7 +547,7 @@ exports.updateOrderStatus = async (req, res) => {
 
   try {
     // Find the order by ID and update the status for the specific vendor
-    const order = await Order.findOneAndUpdate(
+    let order = await Order.findOneAndUpdate(
       {
         orderId: orderId,
         "vendors.vendor": new mongoose.Types.ObjectId(vendorId),
@@ -559,6 +559,104 @@ exports.updateOrderStatus = async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: "Order or vendor not found" });
     }
+
+    // --- Arrival Time Calculation Logic ---
+    if (newStatus === "Processing") {
+      try {
+        // 1. Get Vendor Location
+        const vendorDoc = await Vendor.findById(vendorId);
+        if (
+          !vendorDoc ||
+          !vendorDoc.vendorInfo ||
+          !vendorDoc.vendorInfo.address ||
+          !vendorDoc.vendorInfo.address.location
+        ) {
+          console.warn("Vendor location not found for arrival time calculation");
+        } else {
+          const vendorLocation = vendorDoc.vendorInfo.address.location.coordinates; // [long, lat]
+
+          // 2. Get Customer Location from Order
+          if (
+            order.shippingAddress &&
+            order.shippingAddress.location &&
+            order.shippingAddress.location.coordinates
+          ) {
+            const customerLocation = order.shippingAddress.location.coordinates; // [long, lat]
+
+            // 3. Calculate Distance (Haversine Formula)
+            const toRad = (value) => (value * Math.PI) / 180;
+            const R = 6371; // Radius of Earth in km
+            const dLat = toRad(customerLocation[1] - vendorLocation[1]);
+            const dLon = toRad(customerLocation[0] - vendorLocation[0]);
+            const lat1 = toRad(vendorLocation[1]);
+            const lat2 = toRad(customerLocation[1]);
+
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.sin(dLon / 2) *
+                Math.sin(dLon / 2) *
+                Math.cos(lat1) *
+                Math.cos(lat2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distanceKm = R * c;
+
+            // 4. Calculate Travel Time (Speed = 30 kmph)
+            // Time = Distance / Speed
+            const travelTimeHours = distanceKm / 30;
+            const travelTimeMinutes = travelTimeHours * 60;
+
+            // 5. Get Max Food Preparation Time
+            // We need to find the products for this specific vendor in the order
+            const vendorOrderEntry = order.vendors.find(
+              (v) => v.vendor.toString() === vendorId
+            );
+
+            let maxPrepTime = 0;
+            if (vendorOrderEntry && vendorOrderEntry.products) {
+              for (const prodEntry of vendorOrderEntry.products) {
+                const product = await Product.findById(prodEntry.product);
+                if (product && product.foodPreparationTime) {
+                  if (product.foodPreparationTime > maxPrepTime) {
+                    maxPrepTime = product.foodPreparationTime;
+                  }
+                }
+              }
+            }
+
+            // 6. Total Time & Estimated Delivery Date
+            const totalTimeMinutes = maxPrepTime + travelTimeMinutes;
+            const now = new Date();
+            const estimatedDeliveryDate = new Date(
+              now.getTime() + totalTimeMinutes * 60000
+            );
+
+            // 7. Update Order with Estimated Delivery Date
+            // We need to update the specific vendor entry in the array again
+            await Order.findOneAndUpdate(
+              {
+                orderId: orderId,
+                "vendors.vendor": new mongoose.Types.ObjectId(vendorId),
+              },
+              {
+                $set: { "vendors.$.estimatedDeliveryDate": estimatedDeliveryDate },
+              }
+            );
+            
+            // Refresh order object to return updated data
+             order = await Order.findOne({
+                orderId: orderId,
+             });
+
+          } else {
+             console.warn("Customer location not found in order for arrival time calculation");
+          }
+        }
+      } catch (calcError) {
+        console.error("Error calculating arrival time:", calcError);
+        // Don't block the status update if calculation fails
+      }
+    }
+    // --------------------------------------
 
     // Extract customer ID from the order
     const customerId = order.customer._id;

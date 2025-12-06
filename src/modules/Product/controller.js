@@ -19,6 +19,7 @@ exports.addProduct = async (req, res) => {
       vendor,
       availableLocalities,
       quantity,
+      foodPreparationTime,
     } = req.body;
 
     // ✅ --- QUICK FIX STARTS HERE ---
@@ -27,6 +28,7 @@ exports.addProduct = async (req, res) => {
     const priceToSave = price || 0;
     const discountToSave = discount || 0;
     const quantityToSave = quantity || 0;
+    const foodPreparationTimeToSave = foodPreparationTime || 0;
     // ✅ --- QUICK FIX ENDS HERE ---
 
     // ✅ Get the S3 URLs from the middleware's result (file.location)
@@ -44,6 +46,7 @@ exports.addProduct = async (req, res) => {
         ? availableLocalities
         : [availableLocalities],
       quantity: quantityToSave, // Use the fixed value
+      foodPreparationTime: foodPreparationTimeToSave,
     });
 
     const savedProduct = await newProduct.save();
@@ -147,6 +150,7 @@ exports.updateProduct = async (req, res) => {
       vendor,
       availableLocalities,
       quantity,
+      foodPreparationTime,
     } = req.body;
 
     const product = await Product.findById(id);
@@ -185,6 +189,10 @@ exports.updateProduct = async (req, res) => {
     product.price = price != null ? price : product.price;
     product.discount = discount != null ? discount : product.discount;
     product.quantity = quantity != null ? quantity : product.quantity;
+    product.foodPreparationTime =
+      foodPreparationTime != null
+        ? foodPreparationTime
+        : product.foodPreparationTime;
     // ✅ --- QUICK FIX ENDS HERE ---
 
     product.description = description || product.description;
@@ -356,34 +364,13 @@ exports.getRecentlyAddedProducts = async (req, res) => {
       // and no specific proximity logic is implemented yet.
     }
 
-    let categoryFilter = {};
-    if (userAddress) {
-      const userAddressWords = userAddress.toLowerCase().split(/[\s,]+/);
-      const categories = await Category.find();
-      const filteredCategories = categories.filter((category) => {
-        if (!category.addresses || category.addresses.length === 0) {
-          return false; // Do not include categories with no specified address when a user address is provided
-        }
-        return category.addresses.some((categoryAddress) => {
-          const categoryAddressWords = categoryAddress
-            .toLowerCase()
-            .split(/[\s,]+/);
-          return userAddressWords.some((userWord) =>
-            categoryAddressWords.includes(userWord)
-          );
-        });
-      });
-      const categoryIds = filteredCategories.map((cat) => cat._id);
-      if (categoryIds.length > 0) {
-        categoryFilter = { category: { $in: categoryIds } };
-      }
-    }
+    // Removed Smart Category Matching logic here
 
     const locationFilter = userLocation
       ? { availableLocalities: { $in: [userLocation, "all"] } }
       : {};
 
-    const query = { ...locationFilter, ...categoryFilter, ...vendorFilter };
+    const query = { ...locationFilter, ...vendorFilter };
 
     const recentlyAddedProducts = await Product.find(query)
       .sort({ createdAt: -1 })
@@ -424,28 +411,7 @@ exports.getDiscountedProducts = async (req, res) => {
       // and no specific proximity logic is implemented yet.
     }
 
-    let categoryFilter = {};
-    if (userAddress) {
-      const userAddressWords = userAddress.toLowerCase().split(/[\s,]+/);
-      const categories = await Category.find();
-      const filteredCategories = categories.filter((category) => {
-        if (!category.addresses || category.addresses.length === 0) {
-          return false; // Do not include categories with no specified address when a user address is provided
-        }
-        return category.addresses.some((categoryAddress) => {
-          const categoryAddressWords = categoryAddress
-            .toLowerCase()
-            .split(/[\s,]+/);
-          return userAddressWords.some((userWord) =>
-            categoryAddressWords.includes(userWord)
-          );
-        });
-      });
-      const categoryIds = filteredCategories.map((cat) => cat._id);
-      if (categoryIds.length > 0) {
-        categoryFilter = { category: { $in: categoryIds } };
-      }
-    }
+    // Removed Smart Category Matching logic here
 
     const locationFilter = userLocation
       ? { availableLocalities: { $in: [userLocation, "all"] } }
@@ -454,7 +420,7 @@ exports.getDiscountedProducts = async (req, res) => {
     const query = {
       discount: { $gt: 0 },
       ...locationFilter,
-      ...categoryFilter,
+      ...locationFilter,
       ...vendorFilter,
     };
     console.log("getDiscountedProducts query:", JSON.stringify(query));
@@ -490,43 +456,13 @@ exports.fuzzySearchProducts = async (req, res) => {
 
     // This block is essential for your requirement.
     // If no user address is provided, we don't filter by category address.
-    let categoryFilter = {};
-    if (userAddress) {
-      // 1. FIND MATCHING CATEGORIES
-      // Splits the user's address into words for more flexible matching.
-      const userAddressWords = userAddress.toLowerCase().split(/[\s,]+/);
-      const allCategories = await Category.find({});
-
-      const matchedCategories = allCategories.filter((category) => {
-        // A category must have addresses to be considered for a match.
-        if (!category.addresses || category.addresses.length === 0) {
-          return false;
-        }
-
-        // Check if any of the category's addresses contain any word from the user's address.
-        return category.addresses.some((categoryAddress) => {
-          const categoryAddressWords = categoryAddress
-            .toLowerCase()
-            .split(/[\s,]+/);
-          return userAddressWords.some((userWord) =>
-            categoryAddressWords.includes(userWord)
-          );
-        });
-      });
-
-      // Extract the unique IDs from the categories that matched.
-      const matchedCategoryIds = matchedCategories.map((cat) => cat._id);
-
-      // Prepare the filter to be used in the product query.
-      // This ensures we only look at products within these categories.
-      categoryFilter = { category: { $in: matchedCategoryIds } };
-    }
+    // Removed Smart Category Matching logic here
 
     const regexQuery = new RegExp(searchQuery, "i");
 
     // 2. FIND PRODUCTS USING THE CATEGORY FILTER
     const finalQuery = {
-      ...categoryFilter, // <-- This is the crucial part
+      // Removed categoryFilter
       $or: [
         { name: { $regex: regexQuery } },
         { description: { $regex: regexQuery } },
