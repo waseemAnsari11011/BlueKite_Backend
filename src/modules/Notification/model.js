@@ -28,6 +28,11 @@ const notificationSchema = new mongoose.Schema(
       ref: "Notification",
       default: null,
     }, // Reference to original notification if resent
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      default: null,
+    },
   },
   { timestamps: true }
 );

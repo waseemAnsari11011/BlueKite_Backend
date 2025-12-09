@@ -55,7 +55,17 @@ exports.sendNotificationToAll = async (req, res) => {
     }
 
     // 2. Send notification via FCM with optional image
-    const dataPayload = { type: "marketing", screen: "Home" };
+    const { productId } = req.body;
+    let dataPayload = { type: "marketing", screen: "Home" };
+
+    if (productId) {
+      dataPayload = {
+        type: "product_offer",
+        productId: productId,
+        screen: "Details",
+      };
+    }
+
     await sendPushNotification(tokens, title, body, dataPayload, imageUrl);
 
     // 3. Log the notification
@@ -67,6 +77,7 @@ exports.sendNotificationToAll = async (req, res) => {
       senderModel: "Vendor",
       targetAudience: "all",
       recipientCount: tokens.length,
+      productId: productId || null,
     });
     await newNotification.save();
 

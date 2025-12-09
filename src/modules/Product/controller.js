@@ -69,10 +69,13 @@ exports.getAllProducts = async (req, res) => {
   try {
     const vendorId = req.params.vendorId;
 
+    let query = {};
+    if (vendorId && vendorId !== "all") {
+      query = { vendor: vendorId };
+    }
+
     // Find all products and populate the category field
-    const products = await Product.find({ vendor: vendorId }).populate(
-      "category"
-    );
+    const products = await Product.find(query).populate("category");
 
     // Send response with the products
     res.status(200).json({
