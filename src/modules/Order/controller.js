@@ -339,102 +339,125 @@ exports.createOrder = async (req, res) => {
 exports.getOrdersByVendor = async (req, res) => {
   try {
     const vendorId = new mongoose.Types.ObjectId(req.params.vendorId);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    const vendorOrders = await Order.aggregate([
+    const result = await Order.aggregate([
       // Unwind the vendors array to work with individual vendor documents
       { $unwind: "$vendors" },
       // Match only those documents where the vendor ID matches
       { $match: { "vendors.vendor": vendorId } },
-      // Sort by createdAt in descending order for consistent chronological order
-      { $sort: { createdAt: -1 } }, // Changed from _id to createdAt
-      // Lookup to join customer details
+      // Sort immediately after match to ensure consistent order before pagination
+      { $sort: { createdAt: -1 } },
+      // Use $facet to get both count and paginated data
       {
-        $lookup: {
-          from: "customers", // The name of the customers collection
-          localField: "customer",
-          foreignField: "_id",
-          as: "customerDetails",
-        },
-      },
-      // Unwind the customerDetails array to get the object
-      { $unwind: "$customerDetails" },
-      // Lookup to join vendor details
-      {
-        $lookup: {
-          from: "vendors", // The name of the vendors collection
-          localField: "vendors.vendor",
-          foreignField: "_id",
-          as: "vendorDetails",
-        },
-      },
-      // Unwind the vendorDetails array to get the object
-      { $unwind: "$vendorDetails" },
-      // Unwind the products array to work with individual product documents
-      { $unwind: "$vendors.products" },
-      // Lookup to join product details
-      {
-        $lookup: {
-          from: "products", // The name of the products collection
-          localField: "vendors.products.product",
-          foreignField: "_id",
-          as: "productDetails",
-        },
-      },
-      // Unwind the productDetails array to get the object
-      { $unwind: "$productDetails" },
-      // Group back the products and vendors
-      {
-        $group: {
-          _id: {
-            orderId: "$orderId",
-            customer: "$customerDetails",
-            shippingAddress: "$shippingAddress",
-            vendor: "$vendorDetails",
-            orderStatus: "$vendors.orderStatus",
-            isPaymentVerified: "$isPaymentVerified",
-            paymentStatus: "$paymentStatus",
-            razorpay_payment_id: "$razorpay_payment_id",
-            deliveryCharge: "$deliveryCharge", // Include delivery charge in grouping
-            createdAt: "$createdAt", // Include createdAt in grouping for consistent sorting after group
-          },
-          products: {
-            $push: {
-              product: "$productDetails",
-              quantity: "$vendors.products.quantity",
-              price: "$vendors.products.price",
-              discount: "$vendors.products.discount",
-              _id: "$vendors.products._id",
-              totalAmount: "$vendors.products.totalAmount",
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            // Lookup to join customer details
+            {
+              $lookup: {
+                from: "customers", // The name of the customers collection
+                localField: "customer",
+                foreignField: "_id",
+                as: "customerDetails",
+              },
             },
-          },
-        },
-      },
-      // Re-sort after grouping to maintain the order based on createdAt
-      { $sort: { "_id.createdAt": -1 } },
-      // Project to reshape the output document
-      {
-        $project: {
-          _id: 0,
-          orderId: "$_id.orderId",
-          customer: "$_id.customer",
-          shippingAddress: "$_id.shippingAddress",
-          isPaymentVerified: "$_id.isPaymentVerified",
-          paymentStatus: "$_id.paymentStatus",
-          razorpay_payment_id: "$_id.razorpay_payment_id",
-          deliveryCharge: "$_id.deliveryCharge", // Add delivery charge to the projection
-          createdAt: "$_id.createdAt", // Add createdAt to the projection
-          vendors: {
-            vendor: "$_id.vendor",
-            orderStatus: "$_id.orderStatus",
-            products: "$products",
-          },
+            // Unwind the customerDetails array to get the object
+            { $unwind: "$customerDetails" },
+            // Lookup to join vendor details
+            {
+              $lookup: {
+                from: "vendors", // The name of the vendors collection
+                localField: "vendors.vendor",
+                foreignField: "_id",
+                as: "vendorDetails",
+              },
+            },
+            // Unwind the vendorDetails array to get the object
+            { $unwind: "$vendorDetails" },
+            // Unwind the products array to work with individual product documents
+            { $unwind: "$vendors.products" },
+            // Lookup to join product details
+            {
+              $lookup: {
+                from: "products", // The name of the products collection
+                localField: "vendors.products.product",
+                foreignField: "_id",
+                as: "productDetails",
+              },
+            },
+            // Unwind the productDetails array to get the object
+            { $unwind: "$productDetails" },
+            // Group back the products and vendors
+            {
+              $group: {
+                _id: {
+                  orderId: "$orderId",
+                  customer: "$customerDetails",
+                  shippingAddress: "$shippingAddress",
+                  vendor: "$vendorDetails",
+                  orderStatus: "$vendors.orderStatus",
+                  isPaymentVerified: "$isPaymentVerified",
+                  paymentStatus: "$paymentStatus",
+                  razorpay_payment_id: "$razorpay_payment_id",
+                  deliveryCharge: "$deliveryCharge", // Include delivery charge in grouping
+                  createdAt: "$createdAt", // Include createdAt in grouping for consistent sorting after group
+                },
+                products: {
+                  $push: {
+                    product: "$productDetails",
+                    quantity: "$vendors.products.quantity",
+                    price: "$vendors.products.price",
+                    discount: "$vendors.products.discount",
+                    _id: "$vendors.products._id",
+                    totalAmount: "$vendors.products.totalAmount",
+                  },
+                },
+              },
+            },
+            // Re-sort after grouping to maintain the order based on createdAt
+            { $sort: { "_id.createdAt": -1 } },
+            // Project to reshape the output document
+            {
+              $project: {
+                _id: 0,
+                orderId: "$_id.orderId",
+                customer: "$_id.customer",
+                shippingAddress: "$_id.shippingAddress",
+                isPaymentVerified: "$_id.isPaymentVerified",
+                paymentStatus: "$_id.paymentStatus",
+                razorpay_payment_id: "$_id.razorpay_payment_id",
+                deliveryCharge: "$_id.deliveryCharge", // Add delivery charge to the projection
+                createdAt: "$_id.createdAt", // Add createdAt to the projection
+                vendors: {
+                  vendor: "$_id.vendor",
+                  orderStatus: "$_id.orderStatus",
+                  products: "$products",
+                },
+              },
+            },
+          ],
         },
       },
     ]);
 
+    const orders = result[0].data;
+    const totalOrders = result[0].metadata[0] ? result[0].metadata[0].total : 0;
+    const totalPages = Math.ceil(totalOrders / limit);
+
+
     res.status(200).json({
       success: true,
-      data: vendorOrders,
+      data: {
+        orders,
+        totalOrders,
+        currentPage: page,
+        totalPages,
+      },
     });
   } catch (error) {
     console.error("Error fetching orders for vendor: ", error);
