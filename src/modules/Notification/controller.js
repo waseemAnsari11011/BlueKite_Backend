@@ -1,5 +1,7 @@
 const Notification = require("./model");
 const Customer = require("../Customer/model");
+const Product = require("../Product/model");
+const Vendor = require("../Vendor/model");
 const { sendPushNotification } = require("../utils/pushNotificationUtil");
 const {
   extractS3KeyFromUrl,
@@ -8,7 +10,7 @@ const {
 
 exports.sendNotificationToAll = async (req, res) => {
   try {
-    const { title, body } = req.body;
+    const { title, body, productId } = req.body;
     const senderId = req.user.id;
 
     console.log("senderId===>>>", senderId);
@@ -38,14 +40,59 @@ exports.sendNotificationToAll = async (req, res) => {
 
     console.log("Final imageUrl===>>>", imageUrl);
 
-    // 1. Get all customer FCM tokens
-    const customers = await Customer.find({ fcmDeviceToken: { $ne: null } })
+    // Filter customers query
+    let customerQuery = { fcmDeviceToken: { $ne: null } };
+
+    // If productId is provided, try to filter by vendor radius
+    if (productId) {
+      const product = await Product.findById(productId);
+      if (product && product.vendor) {
+        const vendor = await Vendor.findById(product.vendor);
+        if (
+          vendor &&
+          vendor.vendorInfo &&
+          vendor.vendorInfo.address &&
+          vendor.vendorInfo.address.location &&
+          vendor.vendorInfo.address.location.coordinates &&
+          vendor.serviceRadius
+        ) {
+          const [longitude, latitude] =
+            vendor.vendorInfo.address.location.coordinates;
+          const radiusInRadians = vendor.serviceRadius / 6378.1; // Earth radius in km
+
+          console.log(
+            `Filtering customers within ${vendor.serviceRadius}km of [${longitude}, ${latitude}]`
+          );
+
+          customerQuery = {
+            ...customerQuery,
+            "shippingAddresses.location": {
+              $geoWithin: {
+                $centerSphere: [[longitude, latitude], radiusInRadians],
+              },
+            },
+          };
+        }
+      }
+    }
+
+    console.log("customerQuery===>>>", JSON.stringify(customerQuery));
+
+    // 1. Get all customer FCM tokens matching the query
+    const customers = await Customer.find(customerQuery)
       .select("fcmDeviceToken")
       .lean();
 
-    console.log("customers===>>>", customers);
+    console.log("customers count===>>>", customers.length);
 
-    const tokens = customers.map((c) => c.fcmDeviceToken);
+    let tokens = customers.map((c) => c.fcmDeviceToken);
+    
+    // Flatten nested arrays if any (handle duplicate tokens later if needed, but uniqueness is key)
+    // Actually, one customer has one token field here.
+    
+    // Remove duplicates if any
+    tokens = [...new Set(tokens)];
+
     console.log("tokens===>>>", tokens);
 
     if (tokens.length === 0) {
@@ -55,7 +102,7 @@ exports.sendNotificationToAll = async (req, res) => {
     }
 
     // 2. Send notification via FCM with optional image
-    const { productId } = req.body;
+    // const { productId } = req.body; // Removed redundant declaration
     let dataPayload = { type: "marketing", screen: "Home" };
 
     if (productId) {

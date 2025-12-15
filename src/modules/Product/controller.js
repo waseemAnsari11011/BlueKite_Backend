@@ -75,7 +75,9 @@ exports.getAllProducts = async (req, res) => {
     }
 
     // Find all products and populate the category field
-    const products = await Product.find(query).populate("category");
+    const products = await Product.find(query)
+      .populate("category")
+      .populate("vendor");
 
     // Send response with the products
     res.status(200).json({
