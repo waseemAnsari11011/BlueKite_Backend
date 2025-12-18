@@ -298,7 +298,12 @@ exports.createOrder = async (req, res) => {
 
     // Send new order notification email and SMS to each vendor
     for (const vendor of vendors) {
-      const vendorId = new mongoose.Types.ObjectId(vendor.vendor);
+      // Robustly handle if vendor.vendor is passed as an object instead of an ID string
+      let vendorIdRaw = vendor.vendor;
+      if (typeof vendorIdRaw === 'object' && vendorIdRaw !== null && vendorIdRaw._id) {
+        vendorIdRaw = vendorIdRaw._id;
+      }
+      const vendorId = new mongoose.Types.ObjectId(vendorIdRaw);
 
       // Fetch the vendor's details using the vendorId
       const vendorDetails = await Vendor.findById(vendorId);
