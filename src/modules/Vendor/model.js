@@ -66,6 +66,9 @@ const vendorSchema = new Schema({
     type: Boolean, // Is the vendor open and accepting orders?
     default: true,
   },
+  fcmDeviceToken: {
+    type: String,
+  },
   role: {
     type: String,
     default: "vendor",

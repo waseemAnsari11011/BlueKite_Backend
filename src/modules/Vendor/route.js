@@ -67,6 +67,13 @@ router.put(
   vendorController.unRestrictVendor
 );
 
+// Route to update FCM token
+router.put(
+  "/vendors/fcm-token/:id",
+  authenticateToken,
+  vendorController.updateFcmToken
+);
+
 // Route to update a vendor by ID (Parameterized - Must be after specific PUT routes)
 router.put(
   "/vendors/:id",

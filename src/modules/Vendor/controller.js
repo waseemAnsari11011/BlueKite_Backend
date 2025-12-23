@@ -637,3 +637,26 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+// Update FCM Token
+exports.updateFcmToken = async (req, res) => {
+  const { id } = req.params;
+  const { fcmToken } = req.body;
+
+  try {
+    const vendor = await Vendor.findByIdAndUpdate(
+      id,
+      { fcmDeviceToken: fcmToken },
+      { new: true }
+    );
+
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    res.status(200).json({ message: "FCM Token updated successfully", vendor });
+  } catch (error) {
+    console.error("Error updating FCM token:", error);
+    res.status(500).json({ message: "Failed to update FCM token", error: error.message });
+  }
+};

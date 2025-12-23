@@ -297,6 +297,7 @@ exports.createOrder = async (req, res) => {
     const savedOrder = await newOrder.save({ session });
 
     // Send new order notification email and SMS to each vendor
+    // Send new order notification email and Push Notification to each vendor
     for (const vendor of vendors) {
       // Robustly handle if vendor.vendor is passed as an object instead of an ID string
       let vendorIdRaw = vendor.vendor;
@@ -316,12 +317,30 @@ exports.createOrder = async (req, res) => {
           customerDetails.contactNumber
         );
 
-        // Send SMS
-        if (
-          vendorDetails.vendorInfo &&
-          vendorDetails.vendorInfo.contactNumber
-        ) {
-          await sendSms(vendorDetails.vendorInfo.contactNumber, "1111");
+        // Send Push Notification
+        if (vendorDetails.fcmDeviceToken) {
+          const title = "New Order Recieved!";
+          const body = `You have received a new order with Order ID: ${savedOrder.orderId}. Please check the app for details.`;
+          try {
+            await sendPushNotification(
+              vendorDetails.fcmDeviceToken,
+              title,
+              body,
+              {
+                type: "new_order",
+                orderId: savedOrder.orderId.toString(),
+                mongoOrderId: savedOrder._id.toString()
+              }
+            );
+            console.log(`Push notification sent to vendor ${vendorDetails._id}`);
+          } catch (pushError) {
+            console.error(
+              `Error sending push notification to vendor ${vendorDetails._id}:`,
+              pushError.message
+            );
+          }
+        } else {
+             console.log(`No FCM token found for vendor ${vendorDetails._id}, skipping push notification.`);
         }
       }
     }
