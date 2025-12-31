@@ -406,6 +406,7 @@ exports.getOrdersByVendor = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
+    const { startDate, endDate } = req.query;
 
     const vendorDoc = await Vendor.findById(vendorId);
     let matchQuery = { "vendors.vendor": vendorId };
@@ -413,6 +414,18 @@ exports.getOrdersByVendor = async (req, res) => {
     if (vendorDoc && vendorDoc.role === "admin") {
       matchQuery = {}; // Admin sees all orders
     }
+
+    if (startDate || endDate) {
+        matchQuery.createdAt = {};
+        if (startDate) {
+            matchQuery.createdAt.$gte = new Date(startDate);
+        }
+        if (endDate) {
+            matchQuery.createdAt.$lte = new Date(endDate);
+        }
+    }
+
+    console.log("getOrdersByVendor matchQuery:", JSON.stringify(matchQuery, null, 2));
 
     const result = await Order.aggregate([
       // Unwind the vendors array to work with individual vendor documents
