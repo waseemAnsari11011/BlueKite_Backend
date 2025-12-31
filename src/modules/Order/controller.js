@@ -347,6 +347,46 @@ exports.createOrder = async (req, res) => {
     // Send OTP to the additional hardcoded number
     await sendSms("9554948693", "1111");
 
+    // Send Push Notification to Admin(s)
+    try {
+      const admins = await Vendor.find({ role: "admin" });
+      for (const admin of admins) {
+        if (admin.fcmDeviceToken) {
+          const title = "New Order Placed!";
+          const body = `A new order has been placed (ID: ${savedOrder.orderId}). Check the admin panel for details.`;
+          
+          try {
+            await sendPushNotification(
+              admin.fcmDeviceToken,
+              title,
+              body,
+              {
+                type: "new_order_admin",
+                orderId: savedOrder.orderId.toString(),
+                mongoOrderId: savedOrder._id.toString()
+              }
+            );
+            console.log(`Push notification sent to admin ${admin.email}`);
+          } catch (pushError) {
+            console.error(
+              `Error sending push notification to admin ${admin.email}:`,
+              pushError.message
+            );
+          }
+        } else {
+             console.log(`No FCM token found for admin ${admin.email}, skipping push notification.`);
+        }
+      }
+    } catch (error) {
+       console.error("Error sending admin push notifications:", error);
+    } // Additional debug logging for admin fetch
+    try {
+        const adminCheck = await Vendor.find({ role: "admin" });
+        console.log("Debug: Found admins for notification:", adminCheck.map(a => ({id: a._id, email: a.email, hasToken: !!a.fcmDeviceToken})));
+    } catch (e) {
+        console.error("Debug: Error checking admins", e);
+    }
+
     await session.commitTransaction();
     session.endSession();
 
@@ -367,11 +407,18 @@ exports.getOrdersByVendor = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
+    const vendorDoc = await Vendor.findById(vendorId);
+    let matchQuery = { "vendors.vendor": vendorId };
+
+    if (vendorDoc && vendorDoc.role === "admin") {
+      matchQuery = {}; // Admin sees all orders
+    }
+
     const result = await Order.aggregate([
       // Unwind the vendors array to work with individual vendor documents
       { $unwind: "$vendors" },
       // Match only those documents where the vendor ID matches
-      { $match: { "vendors.vendor": vendorId } },
+      { $match: matchQuery },
       // Sort immediately after match to ensure consistent order before pagination
       { $sort: { createdAt: -1 } },
       // Use $facet to get both count and paginated data
@@ -496,9 +543,16 @@ exports.getRecentOrdersByVendor = async (req, res) => {
   try {
     const vendorId = new mongoose.Types.ObjectId(req.params.vendorId);
 
+    const vendorDoc = await Vendor.findById(vendorId);
+    let matchQuery = { "vendors.vendor": vendorId };
+
+    if (vendorDoc && vendorDoc.role === "admin") {
+      matchQuery = {}; // Admin sees all orders
+    }
+
     const recentVendorOrders = await Order.aggregate([
       { $unwind: "$vendors" },
-      { $match: { "vendors.vendor": vendorId } },
+      { $match: matchQuery },
       {
         $lookup: {
           from: "customers",
