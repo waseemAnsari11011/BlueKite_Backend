@@ -4,6 +4,7 @@ const orderController = require("../Order/controller"); // Adjust the path accor
 
 // Create a new order
 router.get("/order/getStats", orderController.getStatsForDateRange);
+router.get("/order/system/ping", orderController.ping); // New debug route
 
 router.post("/order", orderController.createOrder);
 router.post("/razorpay", orderController.createOrderRazorpay);

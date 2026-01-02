@@ -15,6 +15,14 @@ const razorpay = new Razorpay({
   key_secret: process.env.KEY_SECRET,
 });
 
+exports.ping = async (req, res) => {
+    return res.status(200).json({ 
+        message: "pong", 
+        timestamp: new Date(),
+        version: "1.0.1-debug" 
+    });
+};
+
 exports.createOrderRazorpay = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
