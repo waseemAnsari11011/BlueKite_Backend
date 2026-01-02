@@ -642,19 +642,30 @@ exports.updateOrderStatus = async (req, res) => {
   console.log(orderId, vendorId, newStatus);
 
   try {
-    // Find the order by ID and update the status for the specific vendor
-    let order = await Order.findOneAndUpdate(
-      {
-        orderId: orderId,
-        "vendors.vendor": new mongoose.Types.ObjectId(vendorId),
-      },
-      { $set: { "vendors.$.orderStatus": newStatus } },
-      { new: true }
-    );
+    // Find the order by custom orderId
+    console.log(`Debug: Querying orderId: "${orderId}"`);
+    let order = await Order.findOne({ orderId: orderId });
 
     if (!order) {
-      return res.status(404).json({ error: "Order or vendor not found" });
+        console.log(`Debug: Order not found for orderId: ${orderId}`);
+        return res.status(404).json({ error: "Order not found" });
     }
+
+    // Find the specific vendor subdocument
+    const vendorEntry = order.vendors.find(v => v.vendor.toString() === vendorId);
+
+    if (!vendorEntry) {
+        console.log(`Debug: Vendor ${vendorId} not found in order ${orderId}. Available vendors: ${order.vendors.map(v => v.vendor.toString())}`);
+        return res.status(404).json({ error: "Vendor not found in this order" });
+    }
+
+    // Update the status
+    vendorEntry.orderStatus = newStatus;
+
+    // Save the changes (we will save again later if needed but this ensures status is set)
+    await order.save();
+    console.log("Debug: Order status updated successfully");
+
 
     // --- Arrival Time Calculation Logic ---
     if (newStatus === "Processing") {
@@ -728,20 +739,14 @@ exports.updateOrderStatus = async (req, res) => {
 
             // 7. Update Order with Estimated Delivery Date
             // We need to update the specific vendor entry in the array again
-            await Order.findOneAndUpdate(
-              {
-                orderId: orderId,
-                "vendors.vendor": new mongoose.Types.ObjectId(vendorId),
-              },
-              {
-                $set: { "vendors.$.estimatedDeliveryDate": estimatedDeliveryDate },
-              }
-            );
+            // 7. Update Order with Estimated Delivery Date
+            vendorEntry.estimatedDeliveryDate = estimatedDeliveryDate;
+            await order.save();
+            console.log("Debug: Estimated delivery date updated");
             
-            // Refresh order object to return updated data
-             order = await Order.findOne({
-                orderId: orderId,
-             });
+            // Refetch not strictly needed if we updated object, but fine to leave order object as is
+            // order is already the Mongoose document with updates applied
+
 
           } else {
              console.warn("Customer location not found in order for arrival time calculation");
