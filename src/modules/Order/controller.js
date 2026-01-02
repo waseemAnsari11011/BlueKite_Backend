@@ -212,24 +212,7 @@ exports.updatePaymentStatusManually = async (req, res) => {
 
 //
 
-const sendSms = async (phoneNumber, message) => {
-  const API = process.env.SMS_API_KEY;
-  const url = `https://sms.renflair.in/V1.php?API=${API}&PHONE=${phoneNumber}&OTP=${message}`;
-  try {
-    const smsResponse = await axios.get(url);
-    if (smsResponse.data.status !== "SUCCESS") {
-      console.error(
-        `SMS sending failed for number: ${phoneNumber}`,
-        smsResponse.data
-      );
-    }
-  } catch (smsError) {
-    console.error(
-      `Error sending SMS to number: ${phoneNumber}`,
-      smsError.message
-    );
-  }
-};
+
 
 exports.createOrder = async (req, res) => {
   const session = await mongoose.startSession();
@@ -344,8 +327,7 @@ exports.createOrder = async (req, res) => {
         }
       }
     }
-    // Send OTP to the additional hardcoded number
-    await sendSms("9554948693", "1111");
+
 
     // Send Push Notification to Admin(s)
     try {
