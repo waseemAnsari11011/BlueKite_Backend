@@ -48,7 +48,7 @@ const sendPushNotification = async (
         notification: {
           ...(imageUrl && { image: imageUrl }),
           sound: "default",
-          channelId: "default", // Make sure this channel exists in your app
+          channelId: "vendor_alert_channel", // Make sure this channel exists in your app
           priority: "high",
         },
       },
@@ -144,7 +144,7 @@ const sendPushNotification = async (
           notification: {
             ...(imageUrl && { image: imageUrl }),
             sound: "default",
-            channelId: "default",
+            channelId: "vendor_alert_channel",
             priority: "high",
           },
         },
