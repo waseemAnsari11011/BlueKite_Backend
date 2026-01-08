@@ -890,6 +890,7 @@ exports.getOrdersByCustomerId = async (req, res) => {
       .populate("customer")
       .populate("vendors.vendor")
       .populate("vendors.products.product")
+      .sort({ createdAt: -1 })
       .exec();
     res.status(200).json(orders);
   } catch (error) {
